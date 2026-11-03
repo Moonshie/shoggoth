@@ -17,6 +17,7 @@ from shoggoth.ui.text_editor import PlainJsonTextEdit
 from shoggoth.ui.face_editor_factory import get_editor_for_face
 from shoggoth.files import translation_dir
 from shoggoth.i18n import get_available_languages_from_dir, tr
+from shoggoth.midnight.widgets import CardTagsWidget
 import shoggoth
 
 
@@ -44,6 +45,10 @@ class CardEditor(QWidget):
 
         self.name_input = LabeledLineEdit(tr("FIELD_NAME"))
         layout.addWidget(self.name_input)
+
+        self.design_tags = CardTagsWidget(card)
+        self.design_tags.changed.connect(self.data_changed.emit)
+        layout.addWidget(self.design_tags)
 
         # Basic info (collapsible band, collapsed by default — rarely touched; stays
         # unfolded across cards for the session once the user opens it)
@@ -535,6 +540,8 @@ class CardEditor(QWidget):
                     del self.card.data[key]
             self.card.data.update(incoming_top)
 
+            self.design_tags.refresh()
+
             self.card.dirty = True
             self.data_changed.emit()
 
@@ -635,6 +642,7 @@ class CardEditor(QWidget):
 
     def load_card(self):
         """Load card data into fields"""
+        self.design_tags.refresh()
         for field in self.fields:
             field.update_from_card(self.card)
 

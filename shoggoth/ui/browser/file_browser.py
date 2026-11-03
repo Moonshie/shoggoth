@@ -10,7 +10,9 @@ from PySide6.QtWidgets import (
 
 from shoggoth.card import natural_sort_key
 from shoggoth.i18n import tr
-from shoggoth.ui.browser.drag_drop import CompactLeafDelegate, DraggableTreeWidget
+from shoggoth.ui.browser.drag_drop import DraggableTreeWidget
+from shoggoth.midnight.sidebar import DesignTagDelegate
+from shoggoth.midnight.tallies import annotate_tree_tallies, update_tree_tallies
 from shoggoth.ui.browser.folder_spec import build_folder_tree_spec
 from shoggoth.ui.browser.tree_spec import build_tree_spec, card_display_name, node_scope
 from shoggoth.ui.browser.tree_sync import TreeSync
@@ -66,7 +68,7 @@ class FileBrowser(QWidget):
         # Tree widget with drag and drop support
         self.tree = DraggableTreeWidget(self)
         self.tree.setHeaderHidden(True)
-        self.tree.setItemDelegate(CompactLeafDelegate(self.tree))
+        self.tree.setItemDelegate(DesignTagDelegate(self.tree))
         self.tree.currentItemChanged.connect(self._on_tree_current_changed)
         self.tree.itemSelectionChanged.connect(self._on_tree_selection_changed)
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -74,6 +76,7 @@ class FileBrowser(QWidget):
 
         # Flat card list tree
         self.list_tree = QTreeWidget(self)
+        self.list_tree.setItemDelegate(DesignTagDelegate(self.list_tree, compact=False))
         self.list_tree.setHeaderHidden(True)
         self.list_tree.currentItemChanged.connect(self._on_list_current_changed)
 
@@ -207,8 +210,10 @@ class FileBrowser(QWidget):
     def _build_spec(self, project):
         """The desired tree state for a project in the current view mode"""
         if self._view_mode == 'folders':
-            return build_folder_tree_spec(project)
-        return build_tree_spec(project)
+            spec = build_folder_tree_spec(project)
+        else:
+            spec = build_tree_spec(project)
+        return annotate_tree_tallies(spec, project)
 
     def rebuild(self):
         """Rebuild the whole tree from scratch, for when a project's identity in
@@ -264,6 +269,7 @@ class FileBrowser(QWidget):
         if item.text(0) != display_name:
             item.setText(0, display_name)
 
+        update_tree_tallies(item)
         return True
 
     def get_card_item(self, card_id, project=None):

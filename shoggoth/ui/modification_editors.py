@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from shoggoth.i18n import tr
+from shoggoth.midnight.widgets import CardTagsWidget
 from shoggoth.ui import compact_theme
 from shoggoth.ui.card_editor import CardEditor
 from shoggoth.ui.compact_widgets import Band
@@ -196,6 +197,10 @@ class TranslationEditor(QWidget):
              False, lambda text: self._set_card_value('name', text)),
         ])
 
+        self.design_tags = CardTagsWidget(card)
+        self.design_tags.changed.connect(self.data_changed.emit)
+        outer.addWidget(self.design_tags)
+
         for side, title in (('front', tr("TAB_FRONT")), ('back', tr("TAB_BACK"))):
             rows = self._face_rows(side)
             if rows:
@@ -356,6 +361,7 @@ class ModificationCompareEditor(QWidget):
         Face editors rebuilt later are created inside editor_container and
         inherit its disabled state."""
         editor.name_input.setEnabled(False)
+        editor.design_tags.setEnabled(False)
         editor.basic_info_band.content.setEnabled(False)
         editor.editor_container.setEnabled(False)
 

@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from shoggoth.i18n import tr
+from shoggoth.midnight.tags import transfer_card_tags
 from shoggoth.ui.browser.tree_spec import card_display_name
 
 
@@ -338,6 +339,7 @@ class TransferCardsDialog(QDialog):
             if copy_mode:
                 new_data = json.loads(json.dumps(card.data))
                 new_data['id'] = str(uuid4())
+                transfer_card_tags(card, destination_project, new_data)
                 self._apply_encounter_policy(new_data, source_project, destination_project)
                 destination_project.add_card(new_data)
                 destination_project.set_dirty(new_data['id'], True)
@@ -345,6 +347,7 @@ class TransferCardsDialog(QDialog):
                 if source_project is destination_project:
                     self._apply_encounter_policy(card.data, source_project, destination_project)
                 else:
+                    transfer_card_tags(card, destination_project, card.data)
                     source_project.data['cards'].remove(card.data)
                     source_project.note_deleted('cards', card.id)
                     self._apply_encounter_policy(card.data, source_project, destination_project)
