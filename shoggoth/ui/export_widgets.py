@@ -265,6 +265,19 @@ def run_image_export(parent, renderer, cards, folder, **export_kwargs):
 
     folder.mkdir(parents=True, exist_ok=True)
 
+    def export_card(card):
+        return renderer_for_card(renderer, card).export_card_images(
+            card, str(folder), **export_kwargs
+        )
+
+    return run_card_export(parent, cards, export_card)
+
+
+def run_card_export(parent, cards, export_card):
+    """Run per-card exports on Python threads with a progress dialog."""
+    if not cards:
+        return False, []
+
     progress = QProgressDialog(
         tr("STATUS_EXPORTING"), tr("BTN_CANCEL"), 0, len(cards), parent
     )
@@ -274,6 +287,7 @@ def run_image_export(parent, renderer, cards, folder, **export_kwargs):
     cores = max(4, multiprocessing.cpu_count() - 1)
     threads = []
     paths = []
+    errors = []
     cancelled = False
 
     for i, card in enumerate(cards):
@@ -287,10 +301,13 @@ def run_image_export(parent, renderer, cards, folder, **export_kwargs):
 
         progress.setLabelText(tr("MSG_EXPORTING_CARD").format(name=card.name))
 
-        def _target(card=card, kw=dict(export_kwargs)):  # noqa: B006 -- binds per-iteration values
-            outputs = renderer_for_card(renderer, card).export_card_images(card, str(folder), **kw)
-            if outputs:
-                paths.extend(outputs)
+        def _target(card=card):
+            try:
+                outputs = export_card(card)
+                if outputs:
+                    paths.extend(outputs)
+            except Exception as error:
+                errors.append(error)
 
         t = threading.Thread(target=_target)
         threads.append(t)
@@ -300,4 +317,6 @@ def run_image_export(parent, renderer, cards, folder, **export_kwargs):
         t.join()
 
     progress.setValue(len(cards))
+    if errors:
+        raise errors[0]
     return cancelled, paths

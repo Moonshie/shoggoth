@@ -1,0 +1,43 @@
+[
+  {
+    "code": "enemy-location-01",
+    "pack_code": "TST",
+    "type_code": "enemy_location",
+    "name": "Writhing Nest",
+    "traits": "Lair. Monster.",
+    "text": "Massive.",
+    "position": 100,
+    "quantity": 1,
+    "encounter_code": "enc-rats",
+    "encounter_position": 9,
+    "faction_code": "mythos",
+    "health": 2,
+    "health_per_investigator": true,
+    "enemy_fight": 2,
+    "enemy_evade": 3,
+    "enemy_damage": 1,
+    "enemy_horror": 1,
+    "clues": 1,
+    "shroud": 2,
+    "victory": 1,
+    "back_link": "enemy-location-01_back",
+    "image_url": "https://example.com/cards/TST/enemy-location-01.webp",
+    "thumbnail_url": "https://example.com/cards/TST/enemy-location-01_thumbnail.webp"
+  },
+  {
+    "code": "enemy-location-01_back",
+    "pack_code": "TST",
+    "type_code": "location",
+    "name": "Writhing Nest",
+    "traits": "Lair.",
+    "text": "Something moves within.",
+    "position": 100,
+    "quantity": 1,
+    "encounter_code": "enc-rats",
+    "encounter_position": 9,
+    "faction_code": "mythos",
+    "hidden": true,
+    "image_url": "https://example.com/cards/TST/enemy-location-01_back.webp",
+    "thumbnail_url": "https://example.com/cards/TST/enemy-location-01_back_thumbnail.webp"
+  }
+]

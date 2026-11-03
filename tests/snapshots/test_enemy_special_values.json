@@ -1,0 +1,22 @@
+[
+  {
+    "code": "enemy-01",
+    "pack_code": "TST",
+    "type_code": "enemy",
+    "name": "Test Acolyte",
+    "traits": "Humanoid. Cultist.",
+    "text": "X is the number of cultists in play.",
+    "position": 20,
+    "quantity": 2,
+    "encounter_code": "enc-cult",
+    "encounter_position": 4,
+    "faction_code": "mythos",
+    "health": 3,
+    "health_per_investigator": true,
+    "enemy_fight": -2,
+    "enemy_evade": null,
+    "enemy_damage": 1,
+    "enemy_horror": 0,
+    "victory": 1
+  }
+]

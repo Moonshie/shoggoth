@@ -1,0 +1,17 @@
+[
+  {
+    "code": "scenario-01",
+    "pack_code": "TST",
+    "type_code": "scenario",
+    "name": "Rats in the Walls",
+    "text": "Easy / Standard\n[skull]: –1. If you fail, take 1 horror.\n[cultist], [tablet]: –2.",
+    "position": 60,
+    "quantity": 1,
+    "encounter_code": "enc-rats",
+    "encounter_position": 5,
+    "faction_code": "mythos",
+    "back_name": "Rats in the Walls",
+    "back_text": "Hard / Expert\n[skull]: –3. If you fail, take 1 horror and 1 damage.\n[elder_thing]: Reveal another token.",
+    "double_sided": true
+  }
+]

@@ -1,0 +1,35 @@
+[
+  {
+    "code": "story-01",
+    "pack_code": "TST",
+    "type_code": "story",
+    "name": "The Rat King Awakens",
+    "text": "Flip this card over. The Rat King enters play.",
+    "flavor": "Something stirs beneath the floorboards.",
+    "position": 40,
+    "quantity": 1,
+    "encounter_code": "enc-rats",
+    "encounter_position": 1,
+    "faction_code": "mythos",
+    "back_link": "story-01_back"
+  },
+  {
+    "code": "story-01_back",
+    "pack_code": "TST",
+    "type_code": "enemy",
+    "name": "The Rat King",
+    "traits": "Creature. Elite.",
+    "text": "Hunter.",
+    "position": 40,
+    "quantity": 1,
+    "encounter_code": "enc-rats",
+    "encounter_position": 1,
+    "faction_code": "mythos",
+    "health": 4,
+    "enemy_fight": 3,
+    "enemy_evade": 2,
+    "enemy_damage": 1,
+    "enemy_horror": 1,
+    "hidden": true
+  }
+]

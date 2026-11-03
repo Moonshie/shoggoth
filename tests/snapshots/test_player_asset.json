@@ -1,0 +1,24 @@
+[
+  {
+    "code": "asset-01",
+    "pack_code": "TST",
+    "type_code": "asset",
+    "name": "Codex of Testing",
+    "subname": "Proof of Concept",
+    "traits": "Item. Tome.",
+    "text": "[action]: Investigate.",
+    "deck_limit": 2,
+    "is_unique": true,
+    "illustrator": "Test Illustrator",
+    "flavor": "Every page is a test.",
+    "position": 12,
+    "quantity": 2,
+    "slot": "Hand. Arcane",
+    "faction_code": "seeker",
+    "faction2_code": "mystic",
+    "cost": 3,
+    "xp": 2,
+    "skill_willpower": 2,
+    "skill_intellect": 1
+  }
+]

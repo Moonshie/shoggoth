@@ -1,0 +1,42 @@
+{
+  "meta": {
+    "author": "Test Author",
+    "code": "TST",
+    "date_updated": "<date_updated>",
+    "language": "en",
+    "generator": "<generator>",
+    "name": "Snapshot Test",
+    "banner_url": "https://example.com/banner.png",
+    "banner_credit": "Test Artist",
+    "description": "A project used by the snapshot tests.",
+    "external_link": "https://example.com/snapshot-test",
+    "status": "draft",
+    "tags": [
+      "campaign",
+      "fan-made"
+    ],
+    "types": [
+      "campaign",
+      "player_cards"
+    ]
+  },
+  "data": {
+    "cards": [],
+    "packs": [
+      {
+        "code": "TST",
+        "name": "Snapshot Test"
+      }
+    ],
+    "encounter_sets": [
+      {
+        "code": "enc-cult",
+        "name": "Cult of Testing"
+      },
+      {
+        "code": "enc-rats",
+        "name": "Swarm of Rats"
+      }
+    ]
+  }
+}

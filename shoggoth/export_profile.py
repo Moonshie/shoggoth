@@ -63,8 +63,7 @@ DEFAULT_SETTINGS = {
         'update_file': None
     },
     'arkham_build': {
-        'url_pattern': None,
-        'export_thumbnails': False,  # placeholder checkbox, not yet implemented
+        'url_prefix': None,
     },
     'guides': {
         'export_pdf': True,

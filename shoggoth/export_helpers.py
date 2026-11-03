@@ -1,200 +1,15 @@
 """
-Export helpers - shared utilities for exporting cards to various formats
+Build SCED metadata for Tabletop Simulator card exports.
 """
 import json
 import re
 
-# Mapping from Shoggoth card types (Card.card_type) to expected front/back pairs
-# Format: card_type -> (export_type, expected_back_type)
-CARD_TYPE_INFO = {
-    # Player cards - have "player" backs
-    'asset': {
-        'export_type': 'asset',
-        'expected_back': 'player',
-        'faction': 'from_classes',  # Derive from card's classes
-    },
-    'event': {
-        'export_type': 'event',
-        'expected_back': 'player',
-        'faction': 'from_classes',
-    },
-    'skill': {
-        'export_type': 'skill',
-        'expected_back': 'player',
-        'faction': 'from_classes',
-    },
-
-    # Customizable cards - have "customizable_back" backs
-    'customizable': {
-        'export_type': 'asset',  # Most customizables are assets
-        'expected_back': 'customizable_back',
-        'faction': 'from_classes',
-    },
-
-    # Investigator cards - have specific front/back
-    'investigator': {
-        'export_type': 'investigator',
-        'expected_back': 'investigator_back',
-        'faction': 'from_classes',
-        'double_sided': True,
-    },
-
-    # Encounter cards - have "encounter" backs
-    'enemy': {
-        'export_type': 'enemy',
-        'expected_back': 'encounter',
-        'faction': 'mythos',
-    },
-    'treachery': {
-        'export_type': 'treachery',
-        'expected_back': 'encounter',
-        'faction': 'mythos',
-    },
-
-    # Location cards - have specific front/back
-    'location': {
-        'export_type': 'location',
-        'expected_back': 'location_back',
-        'faction': 'mythos',
-        'double_sided': True,
-    },
-
-    # Act cards - have specific front/back
-    'act': {
-        'export_type': 'act',
-        'expected_back': 'act_back',
-        'faction': 'mythos',
-        'double_sided': True,
-    },
-
-    # Agenda cards - have specific front/back
-    'agenda': {
-        'export_type': 'agenda',
-        'expected_back': 'agenda_back',
-        'faction': 'mythos',
-        'double_sided': True,
-    },
-
-    # Scenario/Chaos reference cards - same type on both sides
-    'chaos': {
-        'export_type': 'scenario',
-        'expected_back': 'chaos',
-        'faction': 'mythos',
-        'double_sided': True,
-    },
-
-    # Story cards
-    'story': {
-        'export_type': 'story',
-        'expected_back': 'story',  # Or could be encounter
-        'faction': 'mythos',
-    },
-}
-
-# Mapping from Shoggoth class names to arkham.build faction codes
-CLASS_TO_FACTION = {
-    'guardian': 'guardian',
-    'seeker': 'seeker',
-    'rogue': 'rogue',
-    'mystic': 'mystic',
-    'survivor': 'survivor',
-    'neutral': 'neutral',
-}
+from shoggoth.card import base_class
 
 TTS_USES_MAP = {
     "supplies": "Supply",
     "bounties": "Bounty",
 }
-
-def get_card_export_type(card):
-    """
-    Determine the export type for a card based on its card_type.
-
-    Returns a dict with:
-        - type_code: The export type code (e.g., 'asset', 'enemy', 'location')
-        - faction_code: The primary faction code
-        - faction2_code: Secondary faction (for multi-class)
-        - faction3_code: Tertiary faction (for multi-class)
-        - double_sided: Whether the card has meaningful content on both sides
-        - is_encounter: Whether this is an encounter card (vs player card)
-    """
-    card_type = card.card_type
-
-    if card_type not in CARD_TYPE_INFO:
-        return {
-            'type_code': 'unknown',
-            'faction_code': 'neutral',
-            'faction2_code': None,
-            'faction3_code': None,
-            'double_sided': False,
-            'is_encounter': False,
-        }
-
-    info = CARD_TYPE_INFO[card_type]
-
-    # Determine faction(s)
-    faction_code = 'neutral'
-    faction2_code = None
-    faction3_code = None
-
-    if info['faction'] == 'from_classes':
-        classes = card.front.get('classes', [])
-        if classes:
-            if len(classes) >= 1:
-                faction_code = CLASS_TO_FACTION.get(classes[0], 'neutral')
-            if len(classes) >= 2:
-                faction2_code = CLASS_TO_FACTION.get(classes[1], None)
-            if len(classes) >= 3:
-                faction3_code = CLASS_TO_FACTION.get(classes[2], None)
-    else:
-        faction_code = info['faction']
-
-    return {
-        'type_code': info['export_type'],
-        'faction_code': faction_code,
-        'faction2_code': faction2_code,
-        'faction3_code': faction3_code,
-        'double_sided': info.get('double_sided', False),
-        'is_encounter': info['faction'] == 'mythos',
-    }
-
-
-def is_player_card(card):
-    """Check if a card is a player card (has player back)"""
-    info = CARD_TYPE_INFO.get(card.card_type)
-    if info:
-        return info['expected_back'] in ('player', 'customizable_back')
-    return False
-
-
-def is_investigator_card(card):
-    """Check if a card is an investigator card"""
-    return card.card_type == 'investigator'
-
-
-def is_encounter_card(card):
-    """Check if a card is an encounter card"""
-    info = CARD_TYPE_INFO.get(card.card_type)
-    if info:
-        return info['faction'] == 'mythos'
-    return False
-
-
-def parse_slot(face):
-    """
-    Parse slot information from a face.
-
-    Returns the slot string for arkham.build format.
-    """
-    slots = face.get('slots', [])
-    slot = face.get('slot')
-
-    if slots:
-        return ', '.join(slots)
-    elif slot:
-        return slot
-    return None
-
 
 # ---------------------------------------------------------------------------
 # SCED GMNotes metadata builder
@@ -252,25 +67,6 @@ _ICON_KEY_TO_SCED = {
     'Q': 'wildIcons',
 }
 
-_ICON_KEY_TO_SKILL = {
-    'W': 'skill_willpower',
-    'I': 'skill_intellect',
-    'C': 'skill_combat',
-    'A': 'skill_agility',
-    'Q': 'skill_wild',
-}
-
-
-def get_skill_icons(face):
-    """Return dict of non-zero arkham.build skill icon fields from a face."""
-    icons = face.get('icons', '')
-    counts = {}
-    for icon in icons:
-        key = _ICON_KEY_TO_SKILL.get(icon)
-        if key:
-            counts[key] = counts.get(key, 0) + 1
-    return counts
-
 
 def _sced_icon_counts(face):
     """Return dict of non-zero SCED icon count fields from a face."""
@@ -307,10 +103,21 @@ def _sced_location_data(face):
     victory = face.get('victory')
     if victory:
         try:
-            data['victory'] = _try_int(victory)
+            # Attempt direct conversion to number
+            number = _try_int(victory)
+
+            if number is None:
+                # Use regex to find a number after a space
+                match = re.search(r" (\d+)", victory)
+                number = _try_int(match.group(1)) if match else None
+
+            # Write victory data if number was successfully detected
+            if number is not None:
+                data['victory'] = number
+
         except (ValueError, TypeError):
             pass
-  
+
     clues = face.get('clues')
     if clues:
         count, per = parse_per_value(clues)
@@ -368,9 +175,9 @@ def build_gm_notes(card):
     # class / faction
     classes = card.front.get('classes', [])
     if isinstance(classes, str):
-        classes = {c.strip().lower() for c in classes.split(',') if c}
+        classes = {base_class(c.strip().lower()) for c in classes.split(',') if c}
     else:
-        classes = {str(c).strip().lower() for c in classes if c}
+        classes = {base_class(str(c).strip().lower()) for c in classes if c}
 
     if front_type in _ENCOUNTER_TYPES:
         notes['class'] = 'Mythos'
@@ -506,7 +313,11 @@ def build_token_data(data):
             text = entry.get("text", "")
             modifier = get_modifier(text)
 
-            for token_id in entry.get("token", []):
+            tokens = entry.get("token", [])
+            if not isinstance(tokens, list):
+                tokens = [tokens]
+
+            for token_id in tokens:
                 token_name = token_id.replace("_", " ").title()
 
                 token_data[side][token_name] = {

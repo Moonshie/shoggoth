@@ -8,6 +8,7 @@
 
 import re
 
+from shoggoth.card_translations import CARD_KEYWORD_DEFAULTS
 from shoggoth.files import font_dir
 from shoggoth.i18n import tr
 from shoggoth.renderer.richtext.model import Align, Token, TokenType
@@ -38,10 +39,15 @@ FORMATTING_TAGS = {
     '</u>': Token(TokenType.UNDERLINE, start=False),
     '<dbl>': Token(TokenType.DBL_UNDERLINE, start=True),
     '</dbl>': Token(TokenType.DBL_UNDERLINE, start=False),
+    '<s>': Token(TokenType.STRIKE, start=True),
+    '</s>': Token(TokenType.STRIKE, start=False),
     '<br>': Token(TokenType.BREAK),
     '<hr>': Token(TokenType.HR),
     '</indent>': Token(TokenType.INDENT_POP),
-    '<valign>': Token(TokenType.VALIGN),
+    '<align top>': Token(TokenType.VALIGN, 'top'),
+    '<align center>': Token(TokenType.VALIGN, 'center'),
+    '<align bottom>': Token(TokenType.VALIGN, 'bottom'),
+    '<valign>': Token(TokenType.VALIGN, 'center'),
 }
 
 REPLACEMENT_TAGS = {
@@ -51,16 +57,6 @@ REPLACEMENT_TAGS = {
     '<dquoteend>': '”',
     '---': '—',
     '--': '–',
-}
-
-# Replacement tags whose expansion is translatable: tag -> (translation key, english default)
-_TRANSLATED_REPLACEMENTS = {
-    '<for>': ('<for>', '<b>Forced –</b>'),
-    '<prey>': ('<prey>', '<b>Prey –</b>'),
-    '<rev>': ('<rev>', '<b>Revelation –</b>'),
-    '<spawn>': ('<spawn>', '<b>Spawn –</b>'),
-    '<obj>': ('<obj>', '<b>Objective –</b>'),
-    '<objective>': ('<objective>', '<b>Objective –</b>'),
 }
 
 FONT_ICON_TAGS = {
@@ -204,7 +200,7 @@ _TOKEN_HELP = {
     TokenType.INDENT_POP: 'end indent',
     TokenType.UNDERLINE: 'underline',
     TokenType.DBL_UNDERLINE: 'double underline heading',
-    TokenType.VALIGN: 'vertically center the text from this line on',
+    TokenType.STRIKE: 'strikethrough',
 }
 
 
@@ -216,8 +212,8 @@ class TagTable:
         self.translations = translations or {}
 
         self.replacement_tags = dict(REPLACEMENT_TAGS)
-        for tag, (key, fallback) in _TRANSLATED_REPLACEMENTS.items():
-            self.replacement_tags[tag] = self.translations.get(key, fallback)
+        for tag, fallback in CARD_KEYWORD_DEFAULTS.items():
+            self.replacement_tags[tag] = self.translations.get(tag, fallback)
 
         self.formatting_trie = build_trie(FORMATTING_TAGS)
         self.icon_trie = build_trie(FONT_ICON_TAGS)
@@ -230,6 +226,8 @@ class TagTable:
         for tag, token in FORMATTING_TAGS.items():
             if token.type in (TokenType.FORMAT, TokenType.ALIGN, TokenType.STORY):
                 description = token.value.value if isinstance(token.value, Align) else token.value
+            elif token.type is TokenType.VALIGN:
+                description = f'vertically align the text from this line on: {token.value}'
             else:
                 description = _TOKEN_HELP.get(token.type, token.type.name.lower())
             lines.append(f'  {tag}  ({description})')

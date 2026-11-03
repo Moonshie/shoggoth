@@ -261,6 +261,10 @@ def card_to_tts(card, id, image_folder):
     if card.front.card_type == 'location' and card.back.card_type == 'location' and card.front.get('name') != card.back.get('name'):
         data['HideWhenFaceDown'] = True
 
+    # Handle cards with regular backs
+    if back_type in DEFAULT_IMAGES:
+        data['HideWhenFaceDown'] = True
+
     data['Nickname'] = remove_formatting_tags(card.name)
     data['CardID'] = id * 100
     data['GMNotes'] = build_gm_notes_string(card)
@@ -400,7 +404,7 @@ def update_file(cards, image_folder, file_path_str, export_images):
 
         # special handling for ID since the TTS mod uses that to match mini-card and investigator
         card_id = card.id
-        if card.front.get('type', '') == 'mini_investigator':
+        if card.card_type == 'mini_investigator':
             card_id = card.get('investigator_id', '00000') + '-m'
 
         id_to_card[card_id] = card_to_tts(card, image_id, image_folder)

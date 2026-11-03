@@ -1,0 +1,38 @@
+[
+  {
+    "code": "asset-02",
+    "pack_code": "TST",
+    "type_code": "asset",
+    "name": "Old Lantern",
+    "text": "Uses (3 oil).",
+    "deck_limit": 1,
+    "position": 95,
+    "quantity": 1,
+    "faction_code": "survivor",
+    "cost": 2,
+    "xp": 0,
+    "image_url": "https://example.com/cards/TST/asset-02.webp",
+    "thumbnail_url": "https://example.com/cards/TST/asset-02_thumbnail.webp"
+  },
+  {
+    "code": "location-01",
+    "pack_code": "TST",
+    "type_code": "location",
+    "name": "Abandoned Chapel",
+    "text": "[action]: Search the chapel for Old Lantern (cost 2).\nCard 96, set card 8 of 2 in Cult of Testing. © 2026 Snapshot Games <img src=\"https://example.com/cards/TST/assets/31776b18969023525845e56386aae409536b624afdfb7947c5e448b5c39267f2.png\" style=\"height:1em;vertical-align:middle\">",
+    "position": 96,
+    "quantity": 2,
+    "encounter_code": "enc-cult",
+    "encounter_position": 8,
+    "faction_code": "mythos",
+    "clues": 2,
+    "shroud": 3,
+    "back_name": "Abandoned Chapel",
+    "back_text": "Unrevealed. [action]: Search the chapel for Old Lantern (cost 2).\nCard 96, set card 8 of 2 in Cult of Testing. © 2026 Snapshot Games <img src=\"https://example.com/cards/TST/assets/31776b18969023525845e56386aae409536b624afdfb7947c5e448b5c39267f2.png\" style=\"height:1em;vertical-align:middle\">",
+    "double_sided": true,
+    "image_url": "https://example.com/cards/TST/location-01.webp",
+    "thumbnail_url": "https://example.com/cards/TST/location-01_thumbnail.webp",
+    "back_image_url": "https://example.com/cards/TST/location-01_back.webp",
+    "back_thumbnail_url": "https://example.com/cards/TST/location-01_back_thumbnail.webp"
+  }
+]

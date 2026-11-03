@@ -410,19 +410,13 @@ class ArkhamBuildEntryWidget(QWidget):
         self.project = project
         layout = QVBoxLayout(self)
 
-        notice = QLabel(tr("PE_AB_WIP_NOTICE"))
-        notice.setWordWrap(True)
-        layout.addWidget(notice)
-
-        self._thumbnails_cb = QCheckBox(tr("PE_AB_EXPORT_THUMBNAILS"))
-        layout.addWidget(self._thumbnails_cb)
-
-        url_group = QGroupBox(tr("AB_URL_PATTERN_LABEL"))
+        url_group = QGroupBox(tr("AB_URL_PREFIX_LABEL"))
         url_layout = QVBoxLayout(url_group)
         self._url_input = QLineEdit()
-        self._url_input.setPlaceholderText(tr("AB_URL_PATTERN_PLACEHOLDER"))
+        self._url_input.setPlaceholderText(tr("AB_URL_PREFIX_PLACEHOLDER"))
         url_layout.addWidget(self._url_input)
-        hint = QLabel(tr("AB_URL_PATTERN_HINT"))
+        hint = QLabel(tr("AB_URL_PREFIX_HINT"))
+        hint.setWordWrap(True)
         hint.setStyleSheet("color: #888; font-size: 9pt;")
         url_layout.addWidget(hint)
         layout.addWidget(url_group)
@@ -431,13 +425,11 @@ class ArkhamBuildEntryWidget(QWidget):
 
     def apply(self, entry):
         d = entry.get('settings', {})
-        self._thumbnails_cb.setChecked(d.get('export_thumbnails', False))
-        self._url_input.setText(d.get('url_pattern') or '')
+        self._url_input.setText(d.get('url_prefix') or '')
 
     def read(self):
         settings = {
-            'export_thumbnails': self._thumbnails_cb.isChecked(),
-            'url_pattern': self._url_input.text().strip() or None,
+            'url_prefix': self._url_input.text().strip() or None,
         }
         return {'scope': None, 'settings': settings}
 

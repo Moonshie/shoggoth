@@ -3,6 +3,7 @@ Internationalization (i18n) module for Shoggoth.
 Provides translation support for the user interface.
 """
 import json
+from functools import cache
 from pathlib import Path
 
 # Directory containing translation files
@@ -17,12 +18,12 @@ _fallback_translations: dict = {}
 def get_available_languages() -> dict[str, str]:
     """
     Get all available languages.
-    
+
     Returns:
         Dictionary mapping language codes to display names.
     """
     languages = {}
-    
+
     if TRANSLATIONS_DIR.exists():
         for file in TRANSLATIONS_DIR.glob("*.json"):
             lang_code = file.stem
@@ -33,11 +34,11 @@ def get_available_languages() -> dict[str, str]:
                     languages[lang_code] = lang_name
             except (json.JSONDecodeError, IOError):
                 languages[lang_code] = lang_code
-    
+
     # Ensure English is always available
     if "en" not in languages:
         languages["en"] = "English"
-    
+
     return languages
 
 
@@ -66,10 +67,10 @@ def get_available_languages_from_dir(translations_dir) -> dict[str, str]:
 def load_language(lang_code: str) -> bool:
     """
     Load a language file.
-    
+
     Args:
         lang_code: Language code (e.g., 'en', 'es')
-    
+
     Returns:
         True if successful, False otherwise
     """
@@ -104,6 +105,15 @@ def load_language(lang_code: str) -> bool:
         return False
 
 
+@cache
+def load_catalog(lang_code: str) -> dict[str, str]:
+    try:
+        with open(TRANSLATIONS_DIR / f"{lang_code}.json", 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+
 def get_current_language() -> str:
     """Get the current language code."""
     return _current_language
@@ -112,34 +122,34 @@ def get_current_language() -> str:
 def tr(text: str, **kwargs) -> str:
     """
     Translate a text string.
-    
+
     Args:
         text: The original English text to translate
         **kwargs: Format arguments for string interpolation
-    
+
     Returns:
         Translated text, or original text if no translation found
     """
     # Get translation, fallback to English, then to key itself
     translated = _translations.get(text) or _fallback_translations.get(text, text)
-    
+
     if kwargs:
         try:
             return translated.format(**kwargs)
         except KeyError:
             return translated
-    
+
     return translated
 
 
 def _(text: str, **kwargs) -> str:
     """
     Shorthand alias for tr().
-    
+
     Args:
         text: The original English text to translate
         **kwargs: Format arguments for string interpolation
-    
+
     Returns:
         Translated text
     """

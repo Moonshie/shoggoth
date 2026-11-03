@@ -5,7 +5,8 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from io import BytesIO
 from shoggoth.renderer.richtext import RichTextRenderer
-from shoggoth.files import template_dir, overlay_dir, icon_dir, asset_dir, defaults_dir, translation_dir, path_key
+from shoggoth.card_translations import load_card_translations
+from shoggoth.files import template_dir, overlay_dir, icon_dir, asset_dir, defaults_dir, path_key
 from shoggoth.perf import perf
 from shoggoth.util.shape_alpha import apply_shape_mask, subject_mask, FADE_FLAT
 from shoggoth.util.class_icon import tint_icon
@@ -13,7 +14,6 @@ from pathlib import Path
 import pyvips
 import pypdfium2 as pdfium
 import re
-import json
 import logging
 
 logging.getLogger('PIL').setLevel(logging.ERROR)
@@ -226,12 +226,8 @@ class CardRenderer:
         self.locale = locale
         self.translations = {}
         if locale:
-            try:
-                with perf.span('Load translation file'):
-                    with open(translation_dir / f'{locale}.json', 'r', encoding='utf-8') as file:
-                        self.translations = json.load(file)
-            except Exception as e:
-                print('error while loading translation for renderer:', e)
+            with perf.span('Load translation file'):
+                self.translations = load_card_translations(locale)
         # Absent during __init__: the rich-text renderer is built afterwards
         # and reads the translations/locale itself.
         if hasattr(self, 'rich_text'):
@@ -612,11 +608,7 @@ class CardRenderer:
     def text_replacement(self, field, value, side):
         """ handles advanced text replacement fields """
         value = value.replace('<name>', side.card.name)
-        if side == side.card.front:
-            other_side = side.card.back
-        else:
-            other_side = side.card.front
-        value = value.replace('<copy>', other_side.get(field, '<copy>'))
+        value = value.replace('<copy>', side.other_side.get(field, '<copy>'))
         if side.card.project.icon:
             path = side.card.project.find_file(side.card.project.icon)
             value = value.replace('<exi>', f'<image src="{path}" color="inverted">')
@@ -1495,7 +1487,7 @@ class CardRenderer:
             but this allows for easy json formatting of the card.
             It's essentially just a list of image and text.
         """
-        if side['type'] != 'customizable':
+        if side.card_type != 'customizable':
             return
 
         entries = side.get('entries', [])

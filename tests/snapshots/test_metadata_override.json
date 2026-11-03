@@ -1,0 +1,30 @@
+[
+  {
+    "code": "story-02",
+    "pack_code": "TST",
+    "type_code": "story",
+    "name": "A Hidden Passage",
+    "text": "Manually written text.",
+    "position": 80,
+    "quantity": 1,
+    "encounter_code": "enc-cult",
+    "encounter_position": 6,
+    "faction_code": "mythos",
+    "back_link": "story-02_back"
+  },
+  {
+    "code": "story-02_back",
+    "pack_code": "TST",
+    "type_code": "location",
+    "name": "Secret Tunnel",
+    "traits": "Underground.",
+    "position": 80,
+    "quantity": 1,
+    "encounter_code": "enc-cult",
+    "encounter_position": 6,
+    "faction_code": "mythos",
+    "clues": 1,
+    "hidden": false,
+    "shroud": 3
+  }
+]

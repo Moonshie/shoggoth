@@ -20,6 +20,10 @@ from shoggoth.renderer import renderer_for_card
 from shoggoth.midnight.widgets import ProjectTagsWidget
 
 
+# Content types arkham.build accepts for `meta.types`, in display order.
+PROJECT_CONTENT_TYPES = ['campaign', 'investigators', 'player_cards', 'rework', 'scenario']
+
+
 class ProjectEditor(QWidget):
     """Editor widget for project settings"""
 
@@ -214,6 +218,10 @@ class ProjectEditor(QWidget):
         self.banner_url_input.textChanged.connect(lambda: self.on_field_changed('banner_url'))
         layout.addRow(tr("FIELD_BANNER_URL"), self.banner_url_input)
 
+        self.banner_credit_input = QLineEdit()
+        self.banner_credit_input.textChanged.connect(lambda: self.on_field_changed('banner_credit'))
+        layout.addRow(tr("FIELD_BANNER_CREDIT"), self.banner_credit_input)
+
         self.website_url_input = QLineEdit()
         self.website_url_input.textChanged.connect(lambda: self.on_field_changed('website_url'))
         layout.addRow(tr("FIELD_WEBSITE_URL"), self.website_url_input)
@@ -226,6 +234,18 @@ class ProjectEditor(QWidget):
         self.tags_input.setPlaceholderText(tr("PLACEHOLDER_TAGS"))
         self.tags_input.textChanged.connect(lambda: self.on_field_changed('tags'))
         layout.addRow(tr("FIELD_TAGS"), self.tags_input)
+
+        types_widget = QWidget()
+        types_layout = QHBoxLayout(types_widget)
+        types_layout.setContentsMargins(0, 0, 0, 0)
+        self.type_checkboxes = {}
+        for content_type in PROJECT_CONTENT_TYPES:
+            checkbox = QCheckBox(tr(f"CONTENT_TYPE_{content_type.upper()}"))
+            checkbox.toggled.connect(lambda: self.on_field_changed('types'))
+            types_layout.addWidget(checkbox)
+            self.type_checkboxes[content_type] = checkbox
+        types_layout.addStretch()
+        layout.addRow(tr("FIELD_CONTENT_TYPES"), types_widget)
 
         self.description_input = QTextEdit()
         self.description_input.setMinimumHeight(100)
@@ -310,9 +330,13 @@ class ProjectEditor(QWidget):
 
             self.author_input.setText(self.project.get_meta('author', ''))
             self.banner_url_input.setText(self.project.get_meta('banner_url', ''))
+            self.banner_credit_input.setText(self.project.get_meta('banner_credit', ''))
             self.website_url_input.setText(self.project.get_meta('website_url', ''))
             self.status_input.setText(self.project.get_meta('status', ''))
             self.tags_input.setText(', '.join(self.project.get_meta('tags') or []))
+            types = self.project.get_meta('types') or []
+            for content_type, checkbox in self.type_checkboxes.items():
+                checkbox.setChecked(content_type in types)
             self.description_input.setPlainText(self.project.get_meta('description', '') or '')
 
             # Update statistics
@@ -373,6 +397,8 @@ class ProjectEditor(QWidget):
             self.project.set_meta('author', self.author_input.text() or None)
         elif field_name == 'banner_url':
             self.project.set_meta('banner_url', self.banner_url_input.text() or None)
+        elif field_name == 'banner_credit':
+            self.project.set_meta('banner_credit', self.banner_credit_input.text() or None)
         elif field_name == 'website_url':
             self.project.set_meta('website_url', self.website_url_input.text() or None)
         elif field_name == 'status':
@@ -380,6 +406,9 @@ class ProjectEditor(QWidget):
         elif field_name == 'tags':
             tags = [t.strip() for t in self.tags_input.text().split(',') if t.strip()]
             self.project.set_meta('tags', tags or None)
+        elif field_name == 'types':
+            types = [t for t, checkbox in self.type_checkboxes.items() if checkbox.isChecked()]
+            self.project.set_meta('types', types or None)
         elif field_name == 'description':
             self.project.set_meta('description', self.description_input.toPlainText() or None)
 
