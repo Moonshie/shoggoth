@@ -12,7 +12,7 @@ Card text in Shoggoth is plain text with a few **tags** mixed in: short codes in
 | `<i>Some flavor.</i>` | *Some flavor.* (italic) |
 | `<t>Ally</t>` or `[[Ally]]` | ***Ally*** (the bold italic style used for traits in rules text) |
 
-In a text field, **Ctrl+B**, **Ctrl+I** and **Ctrl+T** wrap the selected text in bold, italic and trait tags. The button row above text fields inserts the most common tags with one click.
+In a text field, **Ctrl+B**, **Ctrl+I** and **Ctrl+T** wrap the selected text in bold, italic and trait tags. The button row above text fields inserts the most common tags with one click. On treacheries it also has *Revelation*, which inserts `<rev>`, and *Put into…*, which inserts `<rev> Put <name> into play in your threat area.` (`<name>` becomes the card's name).
 
 You don't need tags in the **Traits** field. Type `Item. Weapon. Firearm.` and Shoggoth styles it for you.
 
@@ -58,6 +58,12 @@ These tags expand to the bold keyword with its dash. They're also translated aut
 ## Flavor text
 
 Most card types have a separate **Flavor** field. Shoggoth places it under the rules text, centered and in italics, like on official cards, so you don't need to format it yourself.
+
+## Victory
+
+The text gets the whole text box until you fill in **Victory**. When you do, and the Victory line would sit on top of the text, Shoggoth shortens the text box so it ends where Victory begins. Clear Victory again and the text gets its full space back. If you've set your own text box size (see [Advanced text](advanced-text.md#fine-tuning-layout)), Shoggoth leaves it alone.
+
+## Story passages
 
 On story cards and act and agenda backs, story passages go in `<blockquote>...</blockquote>`, which gives them the indented story style. The *Story* button above the text field inserts this for you.
 

@@ -13,7 +13,6 @@ to the same folder), and a `publish` entry uploads exactly the window of
 content produced by entries since the previous `publish` entry (or the start
 of the run) -- see the `produced`/`manifest_cards` reset in run_profile.
 """
-import json
 import multiprocessing
 import threading
 import traceback
@@ -29,7 +28,8 @@ from shoggoth.files import default_export_folder, safe_filename
 from shoggoth.i18n import tr
 from shoggoth.renderer import renderer_for_card
 from shoggoth.settings import EXPORT_SIZES
-from shoggoth.ui.export_widgets import resolve_scope_cards, run_card_export, run_image_export
+from shoggoth.arkham_build.exporter import run_arkham_build_export
+from shoggoth.ui.export_widgets import resolve_scope_cards, run_image_export
 
 _MBPRINT_FORMAT, _MBPRINT_QUALITY = 'png', 100
 
@@ -235,23 +235,11 @@ def _run_tts(parent, project, renderer, cards, scope_type, d):
     return tr(key).format(path=path), image_paths, str(path)
 
 
-def _run_arkham_build(project, settings, renderer, parent=None):
-    """Returns (result_path_str, produced_paths)."""
-    from shoggoth import arkham_build
-    def execute_cards(cards, export_card):
-        cancelled, _ = run_card_export(parent, cards, export_card)
-        if cancelled:
-            raise CancelledError()
-
-    data = arkham_build.export_project(
-        project, settings, renderer, card_executor=execute_cards
-    )
-    output_path = arkham_build.export_folder(project) / f"{project.id}.json"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-    return str(output_path), [str(output_path)]
+def _run_arkham_build(project, settings, renderer, cards, scope_type, parent=None):
+    """Returns (result_path_str, produced_paths). An 'all' scope exports the
+    whole project unfiltered (every encounter set, even empty ones)."""
+    card_ids = None if scope_type == 'all' else [card.id for card in cards]
+    return run_arkham_build_export(project, settings, renderer, parent, card_ids=card_ids)
 
 
 def _run_guides(project, d):
@@ -326,7 +314,9 @@ def run_profile(parent, project, renderer, profile_data):
 
         elif kind == 'arkham_build':
             try:
-                path, data_paths = _run_arkham_build(project, settings, renderer, parent)
+                path, data_paths = _run_arkham_build(
+                    project, settings, renderer, cards, entry.scope.get('type', 'all'), parent
+                )
                 produced['data'].extend(data_paths)
                 results.append(tr("PE_RESULT_ARKHAM_BUILD").format(path=path))
             except CancelledError:

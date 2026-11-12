@@ -8,13 +8,14 @@ Every widget exposes the same pair of methods:
   apply(entry)  -- entry: {'id', 'type', 'scope', 'settings'}; populate the UI
   read() -> {'scope': dict|None, 'settings': dict}
               -- 'scope' is None for kinds with no card scope of their own
-                 (arkham.build, Guides -- see export_profile.USES_SCOPE)
+                 (Guides -- see export_profile.USES_SCOPE)
 """
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QLabel,
     QComboBox, QSpinBox, QCheckBox, QLineEdit, QPushButton, QFileDialog, QFrame,
 )
 
+import shoggoth
 from shoggoth.files import default_export_folder, safe_filename
 from shoggoth.i18n import tr
 from shoggoth.settings import EXPORT_SIZES
@@ -410,8 +411,18 @@ class ArkhamBuildEntryWidget(QWidget):
         self.project = project
         layout = QVBoxLayout(self)
 
-        url_group = QGroupBox(tr("AB_URL_PREFIX_LABEL"))
-        url_layout = QVBoxLayout(url_group)
+        self._scope_selector = ProfileScopeSelector(project)
+        layout.addWidget(self._scope_selector)
+
+        upload_form = QFormLayout()
+        self._upload_combo = QComboBox()
+        self._upload_combo.addItem(tr("AB_UPLOAD_MANUAL"), "manual")
+        self._upload_combo.addItem(tr("AB_UPLOAD_CELAENO"), "celaeno")
+        upload_form.addRow(tr("AB_UPLOAD_LABEL"), self._upload_combo)
+        layout.addLayout(upload_form)
+
+        self._manual_config = QGroupBox(tr("AB_URL_PREFIX_LABEL"))
+        url_layout = QVBoxLayout(self._manual_config)
         self._url_input = QLineEdit()
         self._url_input.setPlaceholderText(tr("AB_URL_PREFIX_PLACEHOLDER"))
         url_layout.addWidget(self._url_input)
@@ -419,19 +430,37 @@ class ArkhamBuildEntryWidget(QWidget):
         hint.setWordWrap(True)
         hint.setStyleSheet("color: #888; font-size: 9pt;")
         url_layout.addWidget(hint)
-        layout.addWidget(url_group)
+        layout.addWidget(self._manual_config)
 
+        self._cloud_hint = QLabel(tr("AB_UPLOAD_CELAENO_HINT"))
+        self._cloud_hint.setWordWrap(True)
+        layout.addWidget(self._cloud_hint)
+        self._upload_combo.currentIndexChanged.connect(self._update_upload_config)
+        self._update_upload_config()
         layout.addStretch()
 
+    def _update_upload_config(self):
+        manual = self._upload_combo.currentData() == 'manual'
+        self._manual_config.setVisible(manual)
+        logged_in = shoggoth.app is not None and bool(
+            shoggoth.app.config.get('Shoggoth', 'publish_token', '')
+        )
+        self._cloud_hint.setVisible(not manual and not logged_in)
+
     def apply(self, entry):
+        self._scope_selector.set_scope(entry.get('scope') or {})
         d = entry.get('settings', {})
+        index = self._upload_combo.findData(d.get('upload_adapter', 'manual'))
+        self._upload_combo.setCurrentIndex(max(0, index))
         self._url_input.setText(d.get('url_prefix') or '')
+        self._update_upload_config()
 
     def read(self):
         settings = {
+            'upload_adapter': self._upload_combo.currentData(),
             'url_prefix': self._url_input.text().strip() or None,
         }
-        return {'scope': None, 'settings': settings}
+        return {'scope': self._scope_selector.read_scope(), 'settings': settings}
 
 
 class GuidesEntryWidget(QWidget):

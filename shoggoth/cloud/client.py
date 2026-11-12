@@ -102,11 +102,9 @@ def ensure_project(base_url: str, token: str, project) -> tuple[str, str | None]
     at first creation) -- so meta changes reach the server even on a publish
     run where no files ended up selected.
 
-    `public_url` is populated as soon as the server has minted the project's
-    Nextcloud share (at creation time now -- see shoggoth_web's
-    storage.ensure_share), independent of whether an admin has published it:
-    the desktop no longer self-publishes, so this is the only way it learns
-    the share link (needed for TTS URL rewriting).
+    `public_url` is the project's public folder (see shoggoth_web's
+    storage.public_root_url), independent of whether an admin has published
+    it. File URLs come from the upload responses, not from this.
 
     Reuses `project.get_meta('cloud_project_id')` if it still resolves (exists
     and is owned by this token); otherwise mints a new server-side project and
@@ -145,6 +143,44 @@ def ensure_project(base_url: str, token: str, project) -> tuple[str, str | None]
     project.set_meta("cloud_project_id", new_id)
     project.save_all()
     return new_id, data.get("public_url")
+
+
+def ensure_artifact_target(
+    base_url: str, token: str, artifact_key: str, title: str
+) -> tuple[str, str | None]:
+    """Find or create a cloud folder for exported files. Leave the source project unchanged.
+
+    The target is found again by `artifact_key` (stored in the server project's
+    metadata), so `title` is only used when creating it: the server derives the
+    storage folder name (``<slug>-<id[:8]>``) from it, just like a regular
+    publish does from the project name.
+    """
+    try:
+        resp = requests.get(
+            f"{base_url}/projects", headers=_auth_headers(token), timeout=_METADATA_TIMEOUT
+        )
+    except requests.RequestException as exc:
+        raise PublishError(f"Could not reach {base_url}: {exc}") from exc
+    _raise_for_status(resp, "Find artifact target")
+
+    for project in _json(resp, "Find artifact target"):
+        metadata = project.get("metadata") or {}
+        if metadata.get("shoggoth_artifact_key") == artifact_key:
+            return project["id"], project.get("public_url")
+
+    try:
+        resp = requests.post(
+            f"{base_url}/projects",
+            json={"title": title, "metadata": {"shoggoth_artifact_key": artifact_key}},
+            headers=_auth_headers(token),
+            timeout=_METADATA_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise PublishError(f"Could not reach {base_url}: {exc}") from exc
+    _raise_for_status(resp, "Create artifact target")
+
+    data = _json(resp, "Create artifact target")
+    return data["id"], data.get("public_url")
 
 
 class _ProgressFile:
