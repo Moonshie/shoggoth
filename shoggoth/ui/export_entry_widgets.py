@@ -10,6 +10,7 @@ Every widget exposes the same pair of methods:
               -- 'scope' is None for kinds with no card scope of their own
                  (Guides -- see export_profile.USES_SCOPE)
 """
+from PySide6.QtCore import QSignalBlocker, Qt
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QLabel,
     QComboBox, QSpinBox, QCheckBox, QLineEdit, QPushButton, QFileDialog, QFrame,
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
 import shoggoth
 from shoggoth.files import default_export_folder, safe_filename
 from shoggoth.i18n import tr
+from shoggoth.midnight.hooks import card_image_naming_options
 from shoggoth.settings import EXPORT_SIZES
 from shoggoth.ui.export_widgets import FilePicker, FolderPicker, ProfileScopeSelector
 
@@ -27,6 +29,7 @@ FILENAME_FORMATS = [
     ('order',     'Order number ({order})'),
     ('name',      'Name only ({name})'),
 ]
+_PER_CARD_NAMING_ROLE = Qt.ItemDataRole.UserRole + 1
 
 PDF_FLAVORS = [
     ('pdf', 'Plain PDF'),
@@ -86,13 +89,12 @@ class ImagesEntryWidget(QWidget):
         naming_group = QGroupBox(tr("IMG_EXPORT_NAMING_LABEL"))
         naming_form = QFormLayout(naming_group)
         self._filename_combo = QComboBox()
-        for _, label in FILENAME_FORMATS:
-            self._filename_combo.addItem(label)
         naming_form.addRow(tr("IMG_EXPORT_FILENAME_LABEL"), self._filename_combo)
         layout.addWidget(naming_group)
 
         options_group = QGroupBox(tr("GROUP_EXPORT_OPTIONS"))
         options_form = QFormLayout(options_group)
+        self._options_form = options_form
         self._rotate = QCheckBox(tr("IMG_EXPORT_ROTATE_OPT"))
         options_form.addRow(tr("IMG_EXPORT_ROTATE_LABEL"), self._rotate)
         self._bleed = QCheckBox(tr("OPT_INCLUDE_BLEED"))
@@ -107,6 +109,35 @@ class ImagesEntryWidget(QWidget):
         layout.addWidget(options_group)
 
         layout.addStretch()
+        self._filename_combo.currentIndexChanged.connect(self._update_naming_options)
+        self._set_filename_format('id')
+
+    def _set_filename_format(self, key):
+        combo = self._filename_combo
+        with QSignalBlocker(combo):
+            combo.clear()
+            for value, label in FILENAME_FORMATS:
+                combo.addItem(label, value)
+            for naming, module_name, enabled in card_image_naming_options():
+                if not enabled and naming.key != key:
+                    continue
+                label = naming.label if enabled else f'{naming.label} (enable {module_name})'
+                combo.addItem(label, naming.key)
+                index = combo.count() - 1
+                combo.setItemData(index, True, _PER_CARD_NAMING_ROLE)
+                if not enabled:
+                    combo.model().item(index).setEnabled(False)
+            combo.setCurrentIndex(max(0, combo.findData(key)))
+        self._update_naming_options()
+
+    def _update_naming_options(self):
+        per_card = bool(self._filename_combo.currentData(_PER_CARD_NAMING_ROLE))
+        self._options_form.setRowVisible(self._separate, not per_card)
+        self._options_form.setRowVisible(self._backs, not per_card)
+        self._filename_combo.setToolTip(
+            'Exports the front and any card-specific back. Skips standard player and encounter backs.'
+            if per_card else ''
+        )
 
     def apply(self, entry):
         self._scope_selector.set_scope(entry.get('scope') or {})
@@ -115,10 +146,7 @@ class ImagesEntryWidget(QWidget):
         self._size_combo.setCurrentIndex(_size_combo_index(self._size_combo, d.get('size_label')))
         self._format_combo.setCurrentText(d.get('format', 'png'))
         self._quality_spin.setValue(d.get('quality', 95))
-        for i, (key, _) in enumerate(FILENAME_FORMATS):
-            if key == d.get('filename_format', 'id'):
-                self._filename_combo.setCurrentIndex(i)
-                break
+        self._set_filename_format(d.get('filename_format', 'id'))
         self._rotate.setChecked(d.get('rotate', False))
         self._bleed.setChecked(d.get('bleed', True))
         self._rounded.setChecked(d.get('rounded', False))
@@ -131,7 +159,7 @@ class ImagesEntryWidget(QWidget):
             'size_label': self._size_combo.currentText(),
             'format': self._format_combo.currentText(),
             'quality': self._quality_spin.value(),
-            'filename_format': FILENAME_FORMATS[self._filename_combo.currentIndex()][0],
+            'filename_format': self._filename_combo.currentData(),
             'rotate': self._rotate.isChecked(),
             'bleed': self._bleed.isChecked(),
             'rounded': self._rounded.isChecked(),
@@ -418,6 +446,7 @@ class ArkhamBuildEntryWidget(QWidget):
         self._upload_combo = QComboBox()
         self._upload_combo.addItem(tr("AB_UPLOAD_MANUAL"), "manual")
         self._upload_combo.addItem(tr("AB_UPLOAD_CELAENO"), "celaeno")
+        self._upload_combo.addItem("Cloudinary", "cloudinary")
         upload_form.addRow(tr("AB_UPLOAD_LABEL"), self._upload_combo)
         layout.addLayout(upload_form)
 
@@ -435,17 +464,24 @@ class ArkhamBuildEntryWidget(QWidget):
         self._cloud_hint = QLabel(tr("AB_UPLOAD_CELAENO_HINT"))
         self._cloud_hint.setWordWrap(True)
         layout.addWidget(self._cloud_hint)
+        self._cloudinary_hint = QLabel(
+            'Set CLOUDINARY_URL in your local .env before launching Shoggoth. '
+            'The export uploads the images and JSON and gives you a public update URL.'
+        )
+        self._cloudinary_hint.setWordWrap(True)
+        layout.addWidget(self._cloudinary_hint)
         self._upload_combo.currentIndexChanged.connect(self._update_upload_config)
         self._update_upload_config()
         layout.addStretch()
 
     def _update_upload_config(self):
-        manual = self._upload_combo.currentData() == 'manual'
-        self._manual_config.setVisible(manual)
-        logged_in = shoggoth.app is not None and bool(
-            shoggoth.app.config.get('Shoggoth', 'publish_token', '')
+        adapter = self._upload_combo.currentData()
+        self._manual_config.setVisible(adapter == 'manual')
+        needs_login = adapter == 'celaeno' and (
+            shoggoth.app is None or not shoggoth.app.config.get('Shoggoth', 'publish_token', '')
         )
-        self._cloud_hint.setVisible(not manual and not logged_in)
+        self._cloud_hint.setVisible(needs_login)
+        self._cloudinary_hint.setVisible(adapter == 'cloudinary')
 
     def apply(self, entry):
         self._scope_selector.set_scope(entry.get('scope') or {})

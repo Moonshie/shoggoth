@@ -26,6 +26,9 @@ from shoggoth import telemetry
 from shoggoth.export_profile import ExportEntry, USES_SCOPE
 from shoggoth.files import default_export_folder, safe_filename
 from shoggoth.i18n import tr
+from shoggoth.midnight.hooks import resolve_card_image_naming
+from shoggoth.midnight.modules.release_sync.exports import plan_entries
+from shoggoth.midnight.registry import module_manager
 from shoggoth.renderer import renderer_for_card
 from shoggoth.settings import EXPORT_SIZES
 from shoggoth.arkham_build.exporter import run_arkham_build_export
@@ -69,12 +72,9 @@ def _export_numbered_cards(parent, renderer, cards, folder, kwargs):
         section can group each image's remote upload by encounter set.
       - card_faces: {card.id: {'front': path|None, 'back': path|None}}, one
         entry per card, for the Publish section's card manifest sync (see
-        _build_card_manifest). `export_card_images` doesn't label which
-        output is which face, but its front/back loop always appends exactly
-        two entries per version in that order -- outputs[0]/outputs[1] are
-        reliably the *first* version's front/back (a card's other versions,
-        if any, are only relevant to print layout, not this id->name/image
-        mapping, so they're not tracked here)."""
+        _build_card_manifest). `export_card_images` returns the front first,
+        then the back if exported. Only the first version's paths are used
+        for the manifest when a card has multiple copies."""
     if not cards:
         return [], {}
     progress = QProgressDialog(tr("STATUS_EXPORTING"), tr("BTN_CANCEL"), 0, len(cards), parent)
@@ -115,6 +115,7 @@ def _export_numbered_cards(parent, renderer, cards, folder, kwargs):
 def _run_images(parent, project, renderer, cards, d):
     """Returns (entries, card_faces) -- see _export_numbered_cards."""
     from shoggoth.card import natural_sort_key
+    resolve_card_image_naming(d['filename_format'])
     cards = sorted(cards, key=lambda c: natural_sort_key(c.project_number))
     folder = _folder_from(project, d['folder'])
     folder.mkdir(parents=True, exist_ok=True)
@@ -213,19 +214,20 @@ def _run_tts(parent, project, renderer, cards, scope_type, d):
         ]
     sync = d['sync']
     update_file = d['update_file']
+    single_copy = module_manager().is_enabled('release_sync')
     # 'campaign'/'all' keep tts_lib's dedicated bag structure (grouped by
     # encounter set); every other scope (player cards, or the new specific
     # encounter-sets/cards scopes) exports the resolved card list as one
     # flat TTS bag via export_player_cards, which accepts any card list.
     if update_file and Path(update_file).exists():
-        status = tts_lib.update_file(cards, folder, update_file, d['export_images'])
+        status = tts_lib.update_file(cards, folder, update_file, d['export_images'], single_copy=single_copy)
         path = update_file
     elif scope_type == 'campaign':
-        status, path = tts_lib.export_campaign(project, folder, sync=sync)
+        status, path = tts_lib.export_campaign(project, folder, sync=sync, single_copy=single_copy)
     elif scope_type == 'all':
-        status, path = tts_lib.export_all(project, folder, sync=sync)
+        status, path = tts_lib.export_all(project, folder, sync=sync, single_copy=single_copy)
     else:
-        status, path = tts_lib.export_player_cards(cards, folder, sync=sync)
+        status, path = tts_lib.export_player_cards(cards, folder, sync=sync, single_copy=single_copy)
 
     key = "TTS_RESULT_TTS_DIR"
     if update_file and Path(update_file).exists():
@@ -235,11 +237,11 @@ def _run_tts(parent, project, renderer, cards, scope_type, d):
     return tr(key).format(path=path), image_paths, str(path)
 
 
-def _run_arkham_build(project, settings, renderer, cards, scope_type, parent=None):
+def _run_arkham_build(project, settings, renderer, cards, scope_type, parent=None, *, image_faces=None):
     """Returns (result_path_str, produced_paths). An 'all' scope exports the
     whole project unfiltered (every encounter set, even empty ones)."""
     card_ids = None if scope_type == 'all' else [card.id for card in cards]
-    return run_arkham_build_export(project, settings, renderer, parent, card_ids=card_ids)
+    return run_arkham_build_export(project, settings, renderer, parent, card_ids=card_ids, image_faces=image_faces)
 
 
 def _run_guides(project, d):
@@ -277,7 +279,7 @@ def run_profile(parent, project, renderer, profile_data):
     tts_result = None  # {'image_paths', 'wrapper_path', 'sync'} from the most recent TTS entry this window
     attempted_kinds = set()  # actual export kinds run this call, for telemetry ('publish' excluded)
 
-    for raw_entry in profile_data.get('entries', []):
+    for raw_entry, share_images in plan_entries(profile_data.get('entries', [])):
         entry = ExportEntry(raw_entry, project)
         kind, settings = entry.type, entry.settings
         cards = resolve_scope_cards(project, entry.scope) if USES_SCOPE.get(kind) else None
@@ -315,7 +317,8 @@ def run_profile(parent, project, renderer, profile_data):
         elif kind == 'arkham_build':
             try:
                 path, data_paths = _run_arkham_build(
-                    project, settings, renderer, cards, entry.scope.get('type', 'all'), parent
+                    project, settings, renderer, cards, entry.scope.get('type', 'all'), parent,
+                    image_faces=card_faces if share_images else None,
                 )
                 produced['data'].extend(data_paths)
                 results.append(tr("PE_RESULT_ARKHAM_BUILD").format(path=path))
@@ -344,13 +347,10 @@ def run_profile(parent, project, renderer, profile_data):
 
         elif kind == 'publish':
             from shoggoth.cloud import registry
-            provider = registry.get_provider(settings.get('provider'))
-            if provider is None:
-                errors.append(tr("PE_RESULT_ERROR_PUBLISH").format(
-                    error=tr("PE_PUBLISH_UNKNOWN_PROVIDER").format(provider=settings.get('provider'))
-                ))
-                continue
             try:
+                provider = registry.get_provider(settings.get('provider'))
+                if provider is None:
+                    raise ValueError(tr("PE_PUBLISH_UNKNOWN_PROVIDER").format(provider=settings.get('provider')))
                 msg = provider.run(parent, project, manifest_cards, card_faces, produced, tts_result, settings)
                 if msg:
                     results.append(msg)

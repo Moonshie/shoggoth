@@ -81,6 +81,14 @@ arkham.build needs the card images online. The entry's **Upload** setting decide
 
 **Celaeno cloud** uploads everything for you. Sign in to the [Library of Celaeno](sharing.md#publishing-to-the-library-of-celaeno) from the **Cloud** menu first. If the server URL isn't set, set it in **File → Settings → Publishing**. The export uploads card images, thumbnails, icons, images from card text, and the JSON file itself. The JSON contains the public image URLs and an update URL. Run the export again to update it. You don't need a **Submit to cloud** entry for this.
 
+**Cloudinary** uploads the same assets and writes a local copy of the JSON.
+Copy the `CLOUDINARY_URL` environment variable from your Cloudinary dashboard
+into your local `.env` file, then restart Shoggoth. In a packaged build, put
+the file beside the executable. In a source checkout, put it in the repository
+folder. The export result shows a public JSON update URL. Subsequent exports
+of the same project update that URL. Keep the credentials in your local
+environment, separate from shared projects and export setups.
+
 **Manual** leaves the uploading to you. Enter a **URL prefix** for the server where you will host the images:
 
 ```
@@ -90,9 +98,9 @@ https://example.com/cards
 The export then saves the images in
 `Export of <project name>/arkham-build/<project ID>/` inside the project folder. Upload that `<project ID>` folder to the URL, so the images end up at `https://example.com/cards/<project ID>/…`. Leave the prefix empty to export the card data without any images. Older export setups use **Manual**.
 
-Either way:
+The generated files include the following.
 
-- Each card side is saved as a WebP image, with a small square thumbnail cut from the card.
+- Each exported card face has an image and a small square thumbnail cut from it. Standalone arkham.build exports render WebP. With [Release sync](midnight.md#release-sync), the full-size image keeps the format and appearance from the Images entry.
 - The project icon, encounter set icons and inline images from card text are copied into the `assets/` subfolder. They keep their original format and content. Shoggoth doesn't convert or recolor them, and an image used several times is copied only once.
 - Inline `<image src="…">`, `<exi>`, `<esi>`, `<project.icon>` and `<encounter.icon>` tags become images with online URLs. If an image file can't be found, its image is left out.
 

@@ -45,6 +45,7 @@ def export_project(
     card_executor: CardExecutor,
     adapter: UploadAdapter | None = None,
     card_ids: Collection[str] | None = None,
+    image_faces: Mapping[str, Mapping[str, str | None]] | None = None,
 ) -> ExportedProject:
     """Export the project, or only the cards in `card_ids` when given.
 
@@ -73,7 +74,7 @@ def export_project(
         "meta": _project_meta(data),
         "data": {
             "cards": _export_cards(
-                project, card_data, adapter, renderer, card_executor, assets
+                project, card_data, adapter, renderer, card_executor, assets, image_faces
             ),
             "packs": [_export_group(data, assets)],
             "encounter_sets": [
@@ -101,6 +102,7 @@ def _export_cards(
     renderer: CardRenderer,
     card_executor: CardExecutor,
     assets: ImageAssetExporter,
+    image_faces: Mapping[str, Mapping[str, str | None]] | None,
 ) -> list[dict[str, object]]:
     cards = [Card(data, project) for data in card_data]
     records_by_id = {}
@@ -112,7 +114,7 @@ def _export_cards(
         )
 
     def export_images(card: Card) -> None:
-        export_card_images(card, targets_by_id[card.id], adapter, renderer)
+        export_card_images(card, targets_by_id[card.id], adapter, renderer, image_faces=image_faces)
 
     image_cards = [card for card in cards if adapter.images_enabled and targets_by_id[card.id]]
     if image_cards:
@@ -163,9 +165,11 @@ class _ExportDialog(QDialog):
         renderer: CardRenderer,
         parent: QWidget | None,
         card_ids: Collection[str] | None = None,
+        image_faces: Mapping[str, Mapping[str, str | None]] | None = None,
     ) -> None:
         super().__init__(parent)
         self._card_ids = card_ids
+        self._image_faces = image_faces
         self.setWindowTitle(tr("PE_SECTION_ARKHAM_BUILD"))
         self._cancelled = threading.Event()
         self.error: Exception | None = None
@@ -223,7 +227,7 @@ class _ExportDialog(QDialog):
             data = export_project(
                 project, settings, renderer,
                 card_executor=self._execute_cards, adapter=adapter,
-                card_ids=self._card_ids,
+                card_ids=self._card_ids, image_faces=self._image_faces,
             )
 
             self._check_cancelled()
@@ -244,8 +248,10 @@ def run_arkham_build_export(
     renderer: CardRenderer,
     parent: QWidget | None = None,
     card_ids: Collection[str] | None = None,
+    *,
+    image_faces: Mapping[str, Mapping[str, str | None]] | None = None,
 ) -> tuple[str, list[str]]:
-    dialog = _ExportDialog(project, settings, renderer, parent, card_ids)
+    dialog = _ExportDialog(project, settings, renderer, parent, card_ids, image_faces)
     dialog._thread.start()
     dialog.exec()
     dialog._thread.join()

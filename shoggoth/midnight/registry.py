@@ -10,6 +10,15 @@ from PySide6.QtCore import QObject, QSettings, Signal
 
 
 @dataclass(frozen=True)
+class CardImageNaming:
+    """Name a card's front and any card-specific back."""
+
+    key: str
+    label: str
+    filename: Callable[[str, bool, str], str]
+
+
+@dataclass(frozen=True)
 class Module:
     id: str
     name: str
@@ -23,6 +32,8 @@ class Module:
     tree_data_keys: tuple[str, ...] = ()
     transfer_card: Callable | None = None
     text_layers: Callable | None = None
+    card_image_naming: CardImageNaming | None = None
+    player_tree: Callable | None = None
 
 
 class ModuleManager(QObject):

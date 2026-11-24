@@ -8,8 +8,8 @@ Git merges, as described below.
 
 ## Modules menu
 
-The top-row **Modules** menu lists **Design tags** and **Designer** as independent
-checkable actions. Both start enabled. Changes take effect immediately and are
+The top-row **Modules** menu lists **Design tags**, **Designer**, **Release sync**,
+and **Tree Ordering** as independent checkable actions. They start enabled and are
 remembered between app launches. These are app-wide preferences, including
 command-line rendering on the same installation; they are not project settings.
 
@@ -23,6 +23,44 @@ cards are transferred while the module is off.
 
 The menu and editor hosts use a shared registry. Future bundled modules register
 there to receive their own toggle without adding another native menu integration.
+
+## Tree Ordering
+
+**Modules → Tree Ordering** sorts player cards in the grouped **Tree** view.
+Investigators come first in Guardian, Seeker, Rogue, Mystic, Survivor, and Neutral
+order. Each investigator group lists the investigator, signatures alphabetically,
+then signature weaknesses.
+
+The class folders follow the same class order. Each level is kept together in
+ascending order, with assets, events, then skills at that level. The existing
+Other folder includes multiclass cards and appears before Neutral. Basic Weakness
+comes after the class folders, followed by unlinked non-basic weaknesses.
+Toggling the module switches the sidebar order immediately. Collection numbers
+are assigned separately by the project's renumber command.
+
+## Release sync
+
+With **Modules → Release sync** enabled, select **Card ID only ({id}, {id}_back)**
+under **File name format** in an **Images** export entry. The preset writes
+`<id>.<ext>` for the front and `<id>_back.<ext>` for a card-specific back. It
+skips standard player and encounter backs. Cards with multiple copies use the
+combined version.
+
+Add **Images** and **arkham.build** to a single export setup to use the Images
+entry's size, format, bleed, and corner settings for full card art on arkham.build.
+Release sync runs Images before arkham.build, which crops its thumbnails from
+the exported files. Set the Images scope to cover the cards in arkham.build.
+**Tabletop Simulator** uses its dedicated 1500 × 2100 WebP renders. Each
+**Submit to cloud** entry marks the end of an export group within the setup.
+
+With Release sync enabled, new TTS bags contain one copy of each exported card.
+In **All cards** and **Campaign cards** exports, shared encounter cards appear
+in their own set's bag. When updating a TTS save, Shoggoth updates every card
+already in the save and exports one of each new card in the unused-cards bag.
+
+Turning Release sync off hides the preset for new selections. Saved setups
+keep their selection. To run an Images entry that uses it, enable Release sync
+or select another filename format for that entry.
 
 ## Designer
 
@@ -184,13 +222,18 @@ The connections to upstream code are:
 | `shoggoth/ui/card_editor.py` | Mount card module controls and refresh them after JSON edits. |
 | `shoggoth/ui/modification_editors.py` | Mount translation module controls and lock originals. |
 | `shoggoth/ui/browser/file_browser.py` | Install module browser bindings and dispatch tree hooks. |
+| `shoggoth/ui/browser/tree_spec.py` | Build native player-card nodes in the order supplied by the active module. |
 | `shoggoth/ui/browser/tree_sync.py` | Preserve registered module data during native synchronization. |
 | `shoggoth/ui/transfer_dialog.py` | Dispatch data-preservation hooks during native card transfer. |
-| `shoggoth/renderer/card_renderer.py` | Render module text layers with the native text pass. |
+| `shoggoth/ui/export_entry_widgets.py` | Offer naming presets from enabled modules. |
+| `shoggoth/ui/export_runner.py` | Run Images before arkham.build and pass along the exported paths. |
+| `shoggoth/renderer/card_renderer.py` | Dispatch module naming presets and render module text layers. |
+| `shoggoth/arkham_build/images.py` | Use exported Images files for uploads and thumbnail crops. |
 
-These native files reference shared hosts/hooks, not individual feature packages.
 `modules/design_tags/` owns the existing tag system; `modules/designer/` owns
 designer credit storage, its editor field, and its temporary render layer.
+`modules/release_sync/` owns the ID-only naming preset and shared export planning.
+`modules/tree_ordering/` owns the grouped player-card tree order.
 
 To add a bundled module, create its package, export a `Module` descriptor, and
 add that descriptor to `MODULES` in `shoggoth/midnight/modules/__init__.py`.

@@ -280,27 +280,36 @@ def _resolve_included_sets(project, encounter):
     return [es for es in resolved if es is not None]
 
 
-def export_all(project, image_folder, sync=True):
-    wrapper = deepcopy(wrapper_template)
+def _append_encounter_bags(bag, project, image_folder, single_copy):
     image_id = 0
     for encounter in project.encounter_sets:
         encounter_wrapper = deepcopy(encounter_template)
-        wrapper['ObjectStates'][0]['ContainedObjects'].append(encounter_wrapper)
+        bag['ContainedObjects'].append(encounter_wrapper)
         encounter_wrapper['DeckIDs'] = []
         encounter_wrapper['Nickname'] = encounter.name
 
-        other_sets = _resolve_included_sets(project, encounter)
-        for enc_set in [encounter] + other_sets:
+        sets = [encounter]
+        # Every required set already has its own bag in these exports.
+        if not single_copy:
+            sets.extend(_resolve_included_sets(project, encounter))
+        for enc_set in sets:
             for card in enc_set.cards:
                 image_id += 1
-                for _ in range(card.amount):
+                for _ in range(min(card.amount, 1) if single_copy else card.amount):
                     encounter_wrapper['ContainedObjects'].append(card_to_tts(card, image_id, image_folder))
                     encounter_wrapper['DeckIDs'].append(image_id)
+    return image_id
+
+
+def export_all(project, image_folder, sync=True, *, single_copy=False):
+    wrapper = deepcopy(wrapper_template)
+    bag = wrapper['ObjectStates'][0]
+    image_id = _append_encounter_bags(bag, project, image_folder, single_copy)
 
     for card in project.player_cards:
         image_id += 1
-        for _ in range(card.amount):
-            wrapper['ObjectStates'][0]['ContainedObjects'].append(card_to_tts(card, image_id, image_folder))
+        for _ in range(min(card.amount, 1) if single_copy else card.amount):
+            bag['ContainedObjects'].append(card_to_tts(card, image_id, image_folder))
 
     return_status = 0
     if files.tts_dir:
@@ -333,22 +342,9 @@ def export_card(card, image_folder, sync=True):
         tts_sync.push_to_tts(wrapper)
 
 
-def export_campaign(project, image_folder, sync=True):
+def export_campaign(project, image_folder, sync=True, *, single_copy=False):
     wrapper = deepcopy(wrapper_template)
-    image_id = 0
-    for encounter in project.encounter_sets:
-        encounter_wrapper = deepcopy(encounter_template)
-        wrapper['ObjectStates'][0]['ContainedObjects'].append(encounter_wrapper)
-        encounter_wrapper['DeckIDs'] = []
-        encounter_wrapper['Nickname'] = encounter.name
-
-        other_sets = _resolve_included_sets(project, encounter)
-        for enc_set in [encounter] + other_sets:
-            for card in enc_set.cards:
-                image_id += 1
-                for _ in range(card.amount):
-                    encounter_wrapper['ContainedObjects'].append(card_to_tts(card, image_id, image_folder))
-                    encounter_wrapper['DeckIDs'].append(image_id)
+    _append_encounter_bags(wrapper['ObjectStates'][0], project, image_folder, single_copy)
 
     return_status = 0
     if files.tts_dir:
@@ -365,12 +361,12 @@ def export_campaign(project, image_folder, sync=True):
     return return_status, output_path
 
 
-def export_player_cards(cards, image_folder, sync=True):
+def export_player_cards(cards, image_folder, sync=True, *, single_copy=False):
     wrapper = deepcopy(wrapper_template)
     image_id = 0
     for card in cards:
         image_id += 1
-        for _ in range(card.amount):
+        for _ in range(min(card.amount, 1) if single_copy else card.amount):
             wrapper['ObjectStates'][0]['ContainedObjects'].append(card_to_tts(card, image_id, image_folder))
 
     return_status = 0
@@ -388,7 +384,7 @@ def export_player_cards(cards, image_folder, sync=True):
     return return_status, output_path
 
 
-def update_file(cards, image_folder, file_path_str, export_images):
+def update_file(cards, image_folder, file_path_str, export_images, *, single_copy=False):
     return_status = 0
 
     # ------------------------------------------------------------
@@ -408,7 +404,7 @@ def update_file(cards, image_folder, file_path_str, export_images):
             card_id = card.get('investigator_id', '00000') + '-m'
 
         id_to_card[card_id] = card_to_tts(card, image_id, image_folder)
-        id_to_amount[card_id] = card.amount
+        id_to_amount[card_id] = min(card.amount, 1) if single_copy else card.amount
 
     # ------------------------------------------------------------
     # Load existing file

@@ -10,7 +10,7 @@ from shoggoth.files import template_dir, overlay_dir, icon_dir, asset_dir, defau
 from shoggoth.perf import perf
 from shoggoth.util.shape_alpha import apply_shape_mask, subject_mask, FADE_FLAT
 from shoggoth.util.class_icon import tint_icon
-from shoggoth.midnight.hooks import text_layers
+from shoggoth.midnight.hooks import resolve_card_image_naming, text_layers
 from pathlib import Path
 import pyvips
 import pypdfium2 as pdfium
@@ -22,6 +22,7 @@ logging.getLogger('pillow').setLevel(logging.ERROR)
 logger = logging.getLogger('shoggoth')
 
 card_value_pattern = re.compile(r'(<:(.*?) (.+?)>)')
+_SHARED_BACK_TYPES = ('player', 'encounter')
 _ILLUS_LRU_MAXSIZE = 24
 # "Natural" pixel size of a PDF page (page points are 1/72"). Only fixes what
 # illustration_scale=1.0 means for PDFs; actual rasterization is done at the
@@ -502,6 +503,28 @@ class CardRenderer:
         # abcd-012345-abcde-02442_cardname_back_0.png
         return f'{variant.id}_{safe(variant.name)}_{{face}}_{{index}}.{{format}}'
 
+    @classmethod
+    def _export_face_paths(cls, card, folder, include_backs, format, separate_versions, filename_format, number):
+        folder = Path(folder)
+        naming = resolve_card_image_naming(filename_format)
+        if naming is not None:
+            yield card, card.front, folder / naming.filename(card.id, False, format)
+            if card.back['type'] not in _SHARED_BACK_TYPES:
+                yield card, card.back, folder / naming.filename(card.id, True, format)
+            return
+
+        faces = card.versions if separate_versions else [card]
+        for index, variant in enumerate(faces):
+            base = cls._filename_base(variant, filename_format)
+            for face, name in ((variant.front, 'front'), (variant.back, 'back')):
+                if face['type'] in _SHARED_BACK_TYPES and not include_backs:
+                    filename = f'{face["type"]}.{format}'
+                else:
+                    face_letter = 'a' if name == 'front' else 'b'
+                    filename = base.format(face=name, order=number + index, format=format,
+                                           face_letter=face_letter, index=index)
+                yield variant, face, folder / filename
+
     def export_card_images(self, card, folder, size, include_backs=False, bleed=True, format='png', quality=100, separate_versions=True, rotate=False, filename_format='id', number=0, text_as_html=False, rounded=False):
         try:
             lossless = quality == 100
@@ -510,26 +533,12 @@ class CardRenderer:
             # Ensure each file path is only written once per export
             exported_paths = set()
 
-            # should each version (eg. 1/2 and 2/2) be printed seperately or as 1-2/2?
-            faces = card.versions
-            if not separate_versions:
-                faces = [card]
-
-            for index, variant in enumerate(faces):
-                base = self._filename_base(variant, filename_format)
-                for face, name in ((variant.front, 'front'), (variant.back, 'back')):
-                    # if this is a repeated card, only export it once
-                    if face['type'] in ('player', 'encounter') and not include_backs:
-                        file_path = Path(folder) / f'{face["type"]}.{format}'
-                    else:
-                        face_letter = 'a' if name == 'front' else 'b'
-                        file_path = Path(folder) / base.format(face=name, order=(number + index), format=format, face_letter=face_letter, index=index)
-
-                    outputs.append(str(file_path))
-
-                    if file_path not in exported_paths:
-                        self._export_side(variant, face, file_path, bleed, rotate, size, quality, lossless, text_as_html, rounded)
-                        exported_paths.add(file_path)
+            for variant, face, file_path in self._export_face_paths(
+                    card, folder, include_backs, format, separate_versions, filename_format, number):
+                outputs.append(str(file_path))
+                if file_path not in exported_paths:
+                    self._export_side(variant, face, file_path, bleed, rotate, size, quality, lossless, text_as_html, rounded)
+                    exported_paths.add(file_path)
 
             return outputs
 
@@ -567,26 +576,11 @@ class CardRenderer:
             # drop stale text layers so image-only exports stay consistent
             sidecar.unlink()
 
-    @staticmethod
-    def expected_export_paths(card, folder, size="", include_backs=False, format='png', separate_versions=True, filename_format='id', number=0):
+    @classmethod
+    def expected_export_paths(cls, card, folder, size="", include_backs=False, format='png', separate_versions=True, filename_format='id', number=0):
         """ Get the expected output paths from export_card_images without actually generating images """
-        outputs = []
-        faces = card.versions
-        if not separate_versions:
-            faces = [card]
-
-        for index, variant in enumerate(faces):
-            base = CardRenderer._filename_base(variant, filename_format)
-            for face, name in ((variant.front, 'front'), (variant.back, 'back')):
-                # if this is a repeated card, only export it once
-                if face['type'] in ('player', 'encounter') and not include_backs:
-                    file_path = Path(folder) / f'{face["type"]}.{format}'
-                    outputs.append(str(file_path))
-                else:
-                    face_letter = 'a' if name == 'front' else 'b'
-                    file_path = Path(folder) / base.format(face=name, order=(number + index), format=format, face_letter=face_letter, index=index)
-                    outputs.append(str(file_path))
-        return outputs
+        return [str(path) for _, _, path in cls._export_face_paths(
+            card, folder, include_backs, format, separate_versions, filename_format, number)]
 
     def pil_to_texture(self, pil_image):
         """Convert PIL image to buffer"""

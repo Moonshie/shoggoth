@@ -1,8 +1,15 @@
 """Upload adapters for arkham.build exports."""
 import json
+import mimetypes
+import os
+import re
+import shutil
+from io import BytesIO
 from pathlib import Path
 from typing import Protocol
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urlsplit
+
+import requests
 
 from shoggoth.arkham_build.data import ExportedProject
 from shoggoth.cloud import client
@@ -21,7 +28,7 @@ class UploadAdapter(Protocol):
 
     def export_file(self, filename: str) -> Path: ...
 
-    def image_url(self, filename: str) -> str: ...
+    def image_url(self, filename: str, *, source: Path | None = None) -> str: ...
 
     def publish(self, path: Path, data: ExportedProject) -> None: ...
 
@@ -29,6 +36,12 @@ class UploadAdapter(Protocol):
 def _write_json(path: Path, data: ExportedProject) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _export_file(project: Project, filename: str) -> Path:
+    destination = export_folder(project) / project.id / filename
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    return destination
 
 
 class ManualUploadAdapter:
@@ -41,11 +54,13 @@ class ManualUploadAdapter:
         return bool(self.url_prefix)
 
     def export_file(self, filename: str) -> Path:
-        destination = export_folder(self.project) / self.project.id / filename
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        return destination
+        return _export_file(self.project, filename)
 
-    def image_url(self, filename: str) -> str:
+    def image_url(self, filename: str, *, source: Path | None = None) -> str:
+        if source is not None:
+            destination = self.export_file(filename)
+            if source.resolve() != destination.resolve():
+                shutil.copyfile(source, destination)
         return f"{self.url_prefix}/{self.project.id}/{quote(filename)}"
 
     def publish(self, path: Path, data: ExportedProject) -> None:
@@ -83,13 +98,11 @@ class CelaenoUploadAdapter:
         return f"{self.public_url}/download?path=/{quote(result['path'], safe='/')}"
 
     def export_file(self, filename: str) -> Path:
-        destination = export_folder(self.project) / self.project.id / filename
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        return destination
+        return _export_file(self.project, filename)
 
-    def image_url(self, filename: str) -> str:
+    def image_url(self, filename: str, *, source: Path | None = None) -> str:
         return self._upload(
-            "images", Path(filename).name, self.export_file(filename),
+            "images", Path(filename).name, source if source is not None else self.export_file(filename),
         )
 
     def publish(self, path: Path, data: ExportedProject) -> None:
@@ -101,12 +114,78 @@ class CelaenoUploadAdapter:
         self._upload("data", path.name, path)
 
 
+class CloudinaryUploadAdapter:
+    images_enabled = True
+
+    def __init__(self, project: Project, credentials: str, *, report, check_cancelled):
+        try:
+            url = urlsplit(credentials.strip())
+            cloud = url.hostname or ""
+            if url.scheme != "cloudinary" or not re.fullmatch(r"[a-z0-9_-]+", cloud):
+                raise ValueError
+            if not url.username or not url.password:
+                raise ValueError
+        except ValueError:
+            raise ValueError("Set CLOUDINARY_URL to your Cloudinary API environment variable and restart Shoggoth.") from None
+        self.project = project
+        self.cloud = cloud
+        self._auth = (unquote(url.username), unquote(url.password))
+        self._namespace = f"shoggoth/arkham-build/{project.id}"
+        self.report = report
+        self.check_cancelled = check_cancelled
+
+    def export_file(self, filename: str) -> Path:
+        return _export_file(self.project, filename)
+
+    def _upload(self, resource_type, filename, public_id, content):
+        self.check_cancelled()
+        self.report(tr("MSG_PUBLISH_UPLOADING").format(name=filename))
+        mime_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        try:
+            response = requests.post(
+                f"https://api.cloudinary.com/v1_1/{self.cloud}/{resource_type}/upload",
+                auth=self._auth, files={"file": (filename, content, mime_type)},
+                data={"public_id": public_id, "overwrite": "true", "invalidate": "true"},
+                timeout=(10, 90), allow_redirects=False,
+            )
+        except requests.RequestException:
+            raise client.PublishError(f"Cloudinary could not upload {filename}. Check the connection and retry.") from None
+        if not 200 <= response.status_code < 300:
+            raise client.PublishError(f"Cloudinary rejected {filename} (HTTP {response.status_code}).")
+        try:
+            secure_url = response.json()["secure_url"]
+            if not isinstance(secure_url, str) or not secure_url.startswith("https://"):
+                raise ValueError
+        except (TypeError, KeyError, ValueError):
+            raise client.PublishError(f"Cloudinary returned no public HTTPS URL for {filename}.") from None
+        return secure_url
+
+    def image_url(self, filename: str, *, source: Path | None = None) -> str:
+        path = source if source is not None else self.export_file(filename)
+        public_id = f"{self._namespace}/{Path(filename).with_suffix('').as_posix()}"
+        with path.open("rb") as content:
+            return self._upload("image", Path(filename).name, public_id, content)
+
+    def publish(self, path: Path, data: ExportedProject) -> None:
+        public_id = f"{self._namespace}/{path.name}"
+        # Use a stable delivery URL so existing arkham.build imports can refresh the export.
+        data["meta"]["url"] = f"https://res.cloudinary.com/{self.cloud}/raw/upload/v1/{quote(public_id, safe='/')}"
+        with BytesIO(json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8")) as content:
+            self._upload("raw", path.name, public_id, content)
+        _write_json(path, data)
+
+
 def create_upload_adapter(
     project, settings, *, config=None, report=None, check_cancelled=None,
 ) -> UploadAdapter:
     adapter = settings.get("upload_adapter", "manual")
     if adapter == "manual":
         return ManualUploadAdapter(project, settings.get("url_prefix") or "")
+    if adapter == "cloudinary":
+        return CloudinaryUploadAdapter(
+            project, os.environ.get("CLOUDINARY_URL", ""),
+            report=report or _noop, check_cancelled=check_cancelled or _noop,
+        )
     if adapter != "celaeno":
         raise ValueError(f"Unknown arkham.build upload adapter: {adapter}")
 

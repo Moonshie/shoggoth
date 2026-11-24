@@ -4,7 +4,7 @@ and guides, in a grouped tree view, a folder view, or a flat sortable list.
 """
 from contextlib import contextmanager
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtCore import QItemSelectionModel
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QHBoxLayout, QLabel, QLineEdit, QStackedWidget,
@@ -97,6 +97,9 @@ class FileBrowser(QWidget):
         self._programmatic_select = False  # suppresses currentItemChanged during setCurrentItem
         self._selected_node_ids = set()  # tree selection as of the last selection change
         self._propagating_selection = False
+        self._module_tree_refresh = QTimer(self)
+        self._module_tree_refresh.setSingleShot(True)
+        self._module_tree_refresh.timeout.connect(self.refresh)
 
         self.sort_combo.currentIndexChanged.connect(self._on_sort_changed)
         self.type_filter_combo.currentIndexChanged.connect(self._on_filter_changed)
@@ -350,7 +353,8 @@ class FileBrowser(QWidget):
         if item.text(0) != display_name:
             item.setText(0, display_name)
 
-        module_hooks.update_tree(item)
+        if module_hooks.update_tree(item):
+            self._module_tree_refresh.start(0)
         return True
 
     def get_card_item(self, card_id, project=None):

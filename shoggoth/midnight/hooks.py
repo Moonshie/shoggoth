@@ -2,6 +2,14 @@
 from .registry import module_manager
 
 
+def player_tree(project, cards):
+    manager = module_manager()
+    for module in manager.modules:
+        if module.player_tree and manager.is_enabled(module.id):
+            return module.player_tree(project, cards)
+    return None
+
+
 def annotate_tree(spec, project):
     manager = module_manager()
     for module in manager.modules:
@@ -11,10 +19,14 @@ def annotate_tree(spec, project):
 
 
 def update_tree(item):
+    """Update module data for one item and report whether its tree spec needs syncing."""
     manager = module_manager()
+    refresh = False
     for module in manager.modules:
         if module.update_tree and manager.is_enabled(module.id):
-            module.update_tree(item)
+            if module.update_tree(item):
+                refresh = True
+    return refresh
 
 
 def tree_data(spec):
@@ -34,3 +46,19 @@ def text_layers(side):
     for module in manager.modules:
         if module.text_layers and manager.is_enabled(module.id):
             yield from module.text_layers(side)
+
+
+def card_image_naming_options():
+    manager = module_manager()
+    for module in manager.modules:
+        if module.card_image_naming is not None:
+            yield module.card_image_naming, module.name, manager.is_enabled(module.id)
+
+
+def resolve_card_image_naming(key):
+    for naming, module_name, enabled in card_image_naming_options():
+        if naming.key == key:
+            if not enabled:
+                raise ValueError(f'Enable {module_name} in the Modules menu to use {naming.label}.')
+            return naming
+    return None

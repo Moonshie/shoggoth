@@ -12,6 +12,7 @@ from PySide6.QtGui import QIcon, QImage, QPixmap, QPainter, QPen, QColor, QPolyg
 
 from shoggoth.files import overlay_dir
 from shoggoth.i18n import tr
+from shoggoth.midnight import hooks as module_hooks
 
 
 def make_inverted_icon(icon_path, project_file_path, size=16):
@@ -160,6 +161,67 @@ def build_guides_spec(project):
     return guide_parent
 
 
+_PLAYER_CLASS_LABELS = {
+    'investigators': 'TREE_INVESTIGATORS',
+    'seeker': 'CLASS_SEEKER',
+    'rogue': 'CLASS_ROGUE',
+    'guardian': 'CLASS_GUARDIAN',
+    'mystic': 'CLASS_MYSTIC',
+    'survivor': 'CLASS_SURVIVOR',
+    'neutral': 'CLASS_NEUTRAL',
+    'other': 'CLASS_OTHER',
+    'basic weakness': 'CLASS_BASIC_WEAKNESS',
+    'weakness': 'CLASS_WEAKNESS',
+}
+_NATIVE_PLAYER_CLASSES = ('investigators', 'seeker', 'rogue', 'guardian', 'mystic', 'survivor', 'neutral', 'other')
+
+
+def build_player_class_spec(project, cls, children):
+    icon = None
+    if cls in ('guardian', 'seeker', 'rogue', 'mystic', 'survivor'):
+        path = overlay_dir / f'class_symbol_{cls}.png'
+        if path.exists():
+            icon = str(path)
+    return {
+        'node_id': f'class:{cls}:{project.file_path}',
+        'text': tr(_PLAYER_CLASS_LABELS[cls]),
+        'type': 'category',
+        'data': project,
+        'class': cls,
+        'icon': icon,
+        'children': children,
+    }
+
+
+def build_investigator_spec(project, group, children):
+    return {
+        'node_id': f'investigator:{group}:{project.file_path}',
+        'text': group,
+        'type': 'category',
+        'data': project,
+        'investigator': group,
+        'icon': None,
+        'children': children,
+    }
+
+
+def _build_native_player_tree(project, cards):
+    classes = {cls: [] for cls in _NATIVE_PLAYER_CLASSES}
+    investigators = {}
+    for card in cards:
+        spec = build_card_spec(card, include_level=True)
+        if group := card.data.get('investigator'):
+            investigators.setdefault(group, []).append(spec)
+        else:
+            classes.get(card.get_class(), classes['other']).append(spec)
+    for group, children in investigators.items():
+        children.sort(key=lambda spec: spec['text'].lower())
+        classes['investigators'].append(build_investigator_spec(project, group, children))
+    for children in classes.values():
+        children.sort(key=lambda spec: spec['text'].lower())
+    return [build_player_class_spec(project, cls, children) for cls, children in classes.items() if children]
+
+
 def build_tree_spec(project):
     """Build a specification of the desired tree state for one project"""
     if not project:
@@ -290,70 +352,11 @@ def build_tree_spec(project):
         unknown_spec['children'].sort(key=lambda s: s['text'].lower())
         campaign_spec['children'].append(unknown_spec)
 
-    # Add player cards
-    class_labels = {
-        'investigators': tr('TREE_INVESTIGATORS'),
-        'seeker': tr('CLASS_SEEKER'),
-        'rogue': tr('CLASS_ROGUE'),
-        'guardian': tr('CLASS_GUARDIAN'),
-        'mystic': tr('CLASS_MYSTIC'),
-        'survivor': tr('CLASS_SURVIVOR'),
-        'neutral': tr('CLASS_NEUTRAL'),
-        'other': tr('CLASS_OTHER'),
-    }
-    classes_with_icons = {'guardian', 'seeker', 'rogue', 'mystic', 'survivor'}
-
-    class_specs = {}
-    for cls in ['investigators', 'seeker', 'rogue', 'guardian', 'mystic', 'survivor', 'neutral', 'other']:
-        icon_path = None
-        if cls in classes_with_icons:
-            path = overlay_dir / f"class_symbol_{cls}.png"
-            if path.exists():
-                icon_path = str(path)
-
-        class_spec = {
-            'node_id': f'class:{cls}:{project.file_path}',
-            'text': class_labels[cls],
-            'type': 'category',
-            'data': project,
-            'class': cls,
-            'icon': icon_path,
-            'children': []
-        }
-        class_specs[cls] = class_spec
-
-    investigator_specs = {}
-
-    for card in project.player_cards:
-        if group := card.data.get('investigator', False):
-            if group not in investigator_specs:
-                inv_spec = {
-                    'node_id': f'investigator:{group}:{project.file_path}',
-                    'text': group,
-                    'type': 'category',
-                    'data': project,
-                    'investigator': group,
-                    'icon': None,
-                    'children': []
-                }
-                investigator_specs[group] = inv_spec
-                class_specs['investigators']['children'].append(inv_spec)
-            target_spec = investigator_specs[group]
-        else:
-            card_class = card.get_class() or 'other'
-            target_spec = class_specs.get(card_class, class_specs['other'])
-
-        card_spec = build_card_spec(card, include_level=True)
-        target_spec['children'].append(card_spec)
-
-    # Sort cards within each group
-    for spec in list(investigator_specs.values()) + list(class_specs.values()):
-        spec['children'].sort(key=lambda s: s['text'].lower())
-
-    # Only add class nodes that have cards
-    for cls in ['investigators', 'seeker', 'rogue', 'guardian', 'mystic', 'survivor', 'neutral', 'other']:
-        if class_specs[cls]['children']:
-            player_spec['children'].append(class_specs[cls])
+    cards = project.player_cards
+    players = module_hooks.player_tree(project, cards)
+    if players is None:
+        players = _build_native_player_tree(project, cards)
+    player_spec['children'].extend(players)
 
     # Add guides
     if guides_spec := build_guides_spec(project):
