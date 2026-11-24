@@ -4,7 +4,7 @@ from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPen, QP
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 from shoggoth.ui.compact_widgets import CLASS_CHIP_COLORS, class_label
-from shoggoth.midnight.tags import is_secondary
+from shoggoth.midnight.modules.design_tags.tags import is_secondary
 
 
 def tag_label(tag):

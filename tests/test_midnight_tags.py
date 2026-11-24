@@ -11,16 +11,16 @@ from PySide6.QtWidgets import (
 )
 
 from conftest import card_data, project_data
-from shoggoth.arkham_build import export_project
+from shoggoth.arkham_build.cards import export_card
 from shoggoth.cloud.merge import from_wire, to_wire
 from shoggoth.export_helpers import build_gm_notes
-from shoggoth.midnight.presentation import TagChip, paint_badge
-from shoggoth.midnight.tallies import TALLY_KEY
-from shoggoth.midnight.tags import (
+from shoggoth.midnight.modules.design_tags.presentation import TagChip, paint_badge
+from shoggoth.midnight.modules.design_tags.tallies import TALLY_KEY
+from shoggoth.midnight.modules.design_tags.tags import (
     card_tag_ids, card_tags, delete_tag, is_secondary, matching_project_tags, project_tags, reorder_tags, save_tag, set_card_tags,
     transfer_card_tags,
 )
-from shoggoth.midnight.widgets import CardTagsWidget, ProjectTagsWidget, TagEditDialog
+from shoggoth.midnight.modules.design_tags.widgets import CardTagsWidget, ProjectTagsWidget, TagEditDialog
 from shoggoth.modification import ModificationProject
 from shoggoth.project import Project
 from shoggoth.ui.compact_widgets import CLASS_CHIP_COLORS
@@ -222,14 +222,14 @@ def test_tags_are_independent_of_faces_and_gameplay_exports(load_project):
     card = project.get_card('a')
     original_front = deepcopy(card.front.data)
     original_face_tags = card.front.tags
-    original_build = export_project(project)
+    original_build = export_card(card)[0]
     original_tts = build_gm_notes(card)
     tag_id = save_tag(project, 'Private design tag', ['mystic', 'rogue'])
     secondary_id = save_tag(project, 'Secondary design tag', ['guardian'], secondary=True)
     set_card_tags(card, [tag_id, secondary_id])
     assert card.front.data == original_front
     assert card.front.tags == original_face_tags
-    assert export_project(project) == original_build
+    assert export_card(card)[0] == original_build
     assert build_gm_notes(card) == original_tts
     assert tag_id not in json.dumps(original_build)
 
@@ -349,7 +349,7 @@ def test_secondary_editor_and_card_rows_keep_order_and_update_designation(qt_app
 
 
 def test_choose_class_filter_follows_cards_and_keeps_existing_assignments(qt_app, load_project, monkeypatch):
-    import shoggoth.midnight.widgets as widgets
+    import shoggoth.midnight.modules.design_tags.widgets as widgets
     monkeypatch.setattr(widgets, '_session_match_classes', False)
     project = load_project(project_data(cards=[
         card_data('a', front={'type': 'asset', 'classes': ['seeker', 'mystic']}),
@@ -495,16 +495,16 @@ def test_project_and_modification_editors_mount_tags_and_lock_originals(qt_app, 
     assert editor.tabs.tabText(2) == 'Design tags'
     tag_id = save_tag(project, 'Draw', ['seeker'])
     card_editor = CardEditor(project.get_card('a'))
-    card_editor.design_tags.toggle_tag(tag_id, True)
+    card_editor.modules.widgets['design_tags'].toggle_tag(tag_id, True)
     project.save_all()
     modification = ModificationProject.create(tmp_path / 'mod.shoggoth', path)
     translation = TranslationEditor(modification.get_card('a'))
-    translation.design_tags.toggle_tag(tag_id, False)
+    translation.modules.widgets['design_tags'].toggle_tag(tag_id, False)
     assert card_tag_ids(modification.get_card('a')) == []
     assert card_tag_ids(project.get_card('a')) == [tag_id]
     comparison = ModificationCompareEditor(modification.get_card('a'))
-    assert comparison.editor.design_tags.isEnabled()
-    assert not comparison.original_editor.design_tags.isEnabled()
+    assert comparison.editor.modules.widgets['design_tags'].isEnabled()
+    assert not comparison.original_editor.modules.widgets['design_tags'].isEnabled()
     for widget in [editor, card_editor, translation, comparison]:
         widget.close()
 
@@ -571,7 +571,7 @@ def test_badges_in_all_sidebar_views_preserve_names(qt_app, load_project, mode):
 def test_secondary_sidebar_tags_use_hover_icon_and_reclassify_live(qt_app, load_project, monkeypatch, mode):
     from PySide6.QtGui import QHelpEvent
     from PySide6.QtWidgets import QStyleOptionViewItem, QToolTip
-    import shoggoth.midnight.sidebar as sidebar
+    import shoggoth.midnight.modules.design_tags.sidebar as sidebar
     from shoggoth.ui.browser.file_browser import FileBrowser
     project = load_project(project_data(cards=[
         card_data('a', 'Mixed card', front={'type': 'asset', 'classes': ['guardian']}),
@@ -697,7 +697,7 @@ def test_tree_header_tallies_follow_descendants_and_incremental_edits(qt_app, lo
 def test_tree_header_uses_one_icon_with_vertical_tallies_on_hover(qt_app, load_project, monkeypatch):
     from PySide6.QtGui import QHelpEvent
     from PySide6.QtWidgets import QStyleOptionViewItem, QToolTip
-    import shoggoth.midnight.sidebar as sidebar
+    import shoggoth.midnight.modules.design_tags.sidebar as sidebar
     from shoggoth.ui.browser.file_browser import FileBrowser
     project = load_project(project_data(cards=[
         card_data('a', front={'type': 'asset', 'classes': ['guardian']}),

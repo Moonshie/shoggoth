@@ -10,6 +10,7 @@ from shoggoth.files import template_dir, overlay_dir, icon_dir, asset_dir, defau
 from shoggoth.perf import perf
 from shoggoth.util.shape_alpha import apply_shape_mask, subject_mask, FADE_FLAT
 from shoggoth.util.class_icon import tint_icon
+from shoggoth.midnight.hooks import text_layers
 from pathlib import Path
 import pyvips
 import pypdfium2 as pdfium
@@ -841,6 +842,11 @@ class CardRenderer:
             card_image.paste(image, region.pos, image)
 
     def render_text(self, card_image, side, s: float = 1.0):
+        self._render_text_fields(card_image, side, s)
+        for layer in text_layers(side):
+            self._render_text_fields(card_image, layer, s)
+
+    def _render_text_fields(self, card_image, side, s: float = 1.0):
         for field in (*DEFAULT_TEXT_FIELDS, *discovered_text_fields(side)):
             value = side.get(field)
             if value and not isinstance(value, str):

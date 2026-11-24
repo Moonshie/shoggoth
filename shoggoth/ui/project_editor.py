@@ -17,7 +17,7 @@ import shoggoth
 from shoggoth.files import translation_dir
 from shoggoth.i18n import tr, get_available_languages_from_dir
 from shoggoth.renderer import renderer_for_card
-from shoggoth.midnight.widgets import ProjectTagsWidget
+from shoggoth.midnight.ui import ProjectModules
 
 
 # Content types arkham.build accepts for `meta.types`, in display order.
@@ -71,9 +71,7 @@ class ProjectEditor(QWidget):
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_info_tab(), tr("TAB_INFO"))
         self.tabs.addTab(self._build_meta_tab(), tr("TAB_META"))
-        self.design_tags = ProjectTagsWidget(self.project)
-        self.design_tags.changed.connect(self.data_changed.emit)
-        self.tabs.addTab(self.design_tags, "Design tags")
+        self.modules = ProjectModules(self, tabs=self.tabs)
 
         outer_layout = QVBoxLayout()
         outer_layout.setContentsMargins(0, 0, 0, 0)
@@ -285,9 +283,7 @@ class ProjectEditor(QWidget):
         layout.addWidget(info_group)
 
         # Card thumbnails section
-        self.design_tags = ProjectTagsWidget(self.project)
-        self.design_tags.changed.connect(self.data_changed.emit)
-        layout.addWidget(self.design_tags)
+        self.modules = ProjectModules(self, layout=layout)
 
         thumbnails_group = QGroupBox(tr("TITLE_CARD_OVERVIEW"))
         thumbnails_layout = QVBoxLayout()

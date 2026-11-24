@@ -88,6 +88,7 @@ class TallyPopupController(QObject):
         self._pressed = QPersistentModelIndex()
         self._position = QPoint()
         self._hover_visible = False
+        self._active = True
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.setInterval(HOVER_DELAY_MS)
@@ -116,6 +117,11 @@ class TallyPopupController(QObject):
     def is_pinned(self):
         return self.popup is not None and self.popup.isVisible()
 
+    def set_active(self, active):
+        self._active = active
+        if not active:
+            self.dismiss()
+
     def _target_at(self, position):
         index = self.tree.indexAt(position)
         if not index.isValid():
@@ -129,6 +135,8 @@ class TallyPopupController(QObject):
         return None
 
     def eventFilter(self, watched, event):
+        if not self._active:
+            return False
         if watched is self.tree and event.type() == QEvent.Hide:
             self.dismiss()
         if watched is not self.viewport:

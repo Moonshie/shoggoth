@@ -7,7 +7,7 @@ from collections import Counter
 
 from PySide6.QtCore import Qt
 
-from shoggoth.midnight.tags import card_tag_ids, project_tags
+from shoggoth.midnight.modules.design_tags.tags import card_tag_ids, project_tags
 
 TALLY_KEY = 'midnight_tag_tallies'
 

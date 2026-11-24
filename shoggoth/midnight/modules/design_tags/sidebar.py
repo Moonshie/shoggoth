@@ -5,10 +5,10 @@ from PySide6.QtCore import Qt, QRect, QRectF
 from PySide6.QtGui import QFontMetrics, QPainter, QPalette, QPen
 from PySide6.QtWidgets import QApplication, QStyle, QStyleOptionViewItem, QToolTip
 
-from shoggoth.midnight.presentation import badge_font, paint_badge, tag_details, tag_label, tag_pips_html
-from shoggoth.midnight.tags import card_tags, is_secondary
-from shoggoth.midnight.tallies import TALLY_KEY
-from shoggoth.midnight.tally_popup import TallyPopupController
+from shoggoth.midnight.modules.design_tags.presentation import badge_font, paint_badge, tag_details, tag_label, tag_pips_html
+from shoggoth.midnight.modules.design_tags.tags import card_tags, is_secondary
+from shoggoth.midnight.modules.design_tags.tallies import TALLY_KEY
+from shoggoth.midnight.modules.design_tags.tally_popup import TallyPopupController
 from shoggoth.ui.browser.drag_drop import CompactLeafDelegate
 
 

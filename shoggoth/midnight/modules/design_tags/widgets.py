@@ -8,9 +8,9 @@ from PySide6.QtWidgets import (
 )
 
 import shoggoth
-from shoggoth.midnight.flow_layout import TagFlowLayout
-from shoggoth.midnight.presentation import TagChip, tag_details, tag_icon, tag_label
-from shoggoth.midnight.tags import (
+from shoggoth.midnight.modules.design_tags.flow_layout import TagFlowLayout
+from shoggoth.midnight.modules.design_tags.presentation import TagChip, tag_details, tag_icon, tag_label
+from shoggoth.midnight.modules.design_tags.tags import (
     PIP_CLASSES, card_tag_ids, card_tags, delete_tag, is_secondary, matching_project_tags, project_tags, reorder_tags, save_tag,
     set_card_tags, tag_usage,
 )

@@ -1,10 +1,58 @@
 # Midnight
 
-Midnight is a personal branch of Shoggoth. Its additions live in
-`shoggoth/midnight/`, with small, explicit connections to the existing Qt UI.
-This is an extension package inside the fork, rather than an independently
-installable plugin. Upstream updates are integrated with Git merges; they do
-not automatically rewrite or port Midnight's features.
+Midnight is a personal branch of Shoggoth. Its optional modules live in
+`shoggoth/midnight/modules/`, with shared integration points for the native UI,
+renderer, and card transfer. Official asset updates do not touch these packages
+or require changes to template JSON. Application updates are integrated with
+Git merges, as described below.
+
+## Modules menu
+
+The top-row **Modules** menu lists **Design tags** and **Designer** as independent
+checkable actions. Both start enabled. Changes take effect immediately and are
+remembered between app launches. These are app-wide preferences, including
+command-line rendering on the same installation; they are not project settings.
+
+Turning a module off hides its editor controls and presentation. Disabling
+Design tags restores the native sidebar and closes pinned tag popups. Disabling
+Designer removes its credit from subsequent previews and rendered exports.
+Open editors retain their contents. Saved credits, tag definitions, and card
+assignments remain in project files, and reappear when their module is enabled.
+Storage operations still preserve module data, including tag definitions when
+cards are transferred while the module is off.
+
+The menu and editor hosts use a shared registry. Future bundled modules register
+there to receive their own toggle without adding another native menu integration.
+
+## Designer
+
+With **Modules → Designer** enabled, open a card and enter a name in **Designer**
+below the card name and design tags. Enter `Mint Tea Fan` to print:
+
+```text
+Des. Mint Tea Fan
+```
+
+Save with **Ctrl+S**, as with other card changes. Leave the field empty to omit
+the credit. The credit belongs to the card and appears on each face with a usable
+collection icon or number region. Faces without either region, such as standard
+card backs, omit it.
+
+The module derives placement and typography from each face's fully resolved
+collection footer, including inherited layouts and card overrides. It prints
+on the same row as the collection number, right-aligned just before the icon
+and number, with a small gap. The icon's space is reserved even when no icon
+is selected. Long names fit within a bounded text region using the native text
+renderer. Illustrator and copyright text keep their original positions. No
+official asset files or stored face regions change.
+
+Designer is included in native rendered card images (and the print/PDF, TTS,
+and arkham.build image paths that use them). It does not add gameplay/export
+metadata or replace the illustrator's attribution. The editor also works in
+modification and translation projects; original-card controls stay locked.
+
+The source value is `card.meta.midnight.designer`, alongside design tags.
+Native save/load, cloud sync, copies, and card transfer preserve it.
 
 ## Design tags
 
@@ -108,7 +156,7 @@ QT_QPA_PLATFORM=offscreen uv run pytest
 ```
 
 If Git reports conflicts, resolve them and complete the merge before running
-the checks. Review the six integration files below if upstream changes their
+the checks. Review the integration files below if upstream changes their
 UI contracts. Open the app and check project tag editing, card assignment,
 sidebar badges in all three views, and save/reload. Once satisfied, push the
 updated branch with `git push origin midnight`.
@@ -120,8 +168,10 @@ updater changes are installed by this feature.
 
 ## Extension boundary
 
-The feature owns its model helpers, widgets, and painting in
-`shoggoth/midnight/`. It uses the native project writer, dirty notifications,
+Each module owns its model helpers, widgets, and presentation in
+`shoggoth/midnight/modules/<module_id>/`. The shared `registry.py`, `hooks.py`,
+and `ui.py` provide activation, hook dispatch, and editor/menu hosts. Modules
+use the native project writer, dirty notifications,
 cloud timestamps, modification diffs, and existing class color palette.
 There are no monkey patches, background watchers, or alternate project files.
 
@@ -129,12 +179,34 @@ The connections to upstream code are:
 
 | File | Connection |
 | --- | --- |
-| `shoggoth/ui/project_editor.py` | Mount the project tag manager. |
-| `shoggoth/ui/card_editor.py` | Mount the card picker and refresh it after JSON edits. |
-| `shoggoth/ui/modification_editors.py` | Mount the translation picker and lock original-card controls. |
-| `shoggoth/ui/browser/file_browser.py` | Install badges and update tree tag tallies. |
-| `shoggoth/ui/browser/tree_sync.py` | Preserve tally data during native tree synchronization. |
-| `shoggoth/ui/transfer_dialog.py` | Carry definitions when the native transfer copies or moves cards. |
+| `shoggoth/ui/main_window/menus.py` | Mount the Modules menu. |
+| `shoggoth/ui/project_editor.py` | Mount project module controls. |
+| `shoggoth/ui/card_editor.py` | Mount card module controls and refresh them after JSON edits. |
+| `shoggoth/ui/modification_editors.py` | Mount translation module controls and lock originals. |
+| `shoggoth/ui/browser/file_browser.py` | Install module browser bindings and dispatch tree hooks. |
+| `shoggoth/ui/browser/tree_sync.py` | Preserve registered module data during native synchronization. |
+| `shoggoth/ui/transfer_dialog.py` | Dispatch data-preservation hooks during native card transfer. |
+| `shoggoth/renderer/card_renderer.py` | Render module text layers with the native text pass. |
+
+These native files reference shared hosts/hooks, not individual feature packages.
+`modules/design_tags/` owns the existing tag system; `modules/designer/` owns
+designer credit storage, its editor field, and its temporary render layer.
+
+To add a bundled module, create its package, export a `Module` descriptor, and
+add that descriptor to `MODULES` in `shoggoth/midnight/modules/__init__.py`.
+`registry.Module` documents the available hooks. Widget factories receive the
+native card/project and return a widget with a `changed` signal; an optional
+`refresh()` resynchronizes controls after JSON edits and reactivation. Browser
+bindings receive the browser and manager, listen to activation changes, and
+restore native presentation when disabled. Bind QObject signal handlers to
+QObject methods so deleting an editor/browser also disconnects its listeners.
+Text-layer hooks return temporary views for the native text renderer; they
+must never change source face/default data. Transfer hooks run even while a
+module is disabled so switching presentation off cannot lose stored data.
+
+Activation uses `midnight/modules/<module_id>/enabled` in Shoggoth's existing
+application preferences. Rendering reads an in-memory snapshot, including from
+background threads, rather than querying Qt settings per card.
 
 Project definitions use `project.meta.midnight.design_tags`:
 
@@ -162,3 +234,7 @@ cloud wire conversion preserve this metadata without changes to either path.
 `tests/test_midnight_tags.py` covers persistence, modification projects, native
 change notifications, cloud wire conversion, transfer behavior, unchanged
 gameplay exports, real Qt controls, and rendered badges in all sidebar views.
+`tests/test_midnight_modules.py` covers independent persistent toggles, live
+editor/sidebar changes, closed tag popups, preserved unsaved editor content,
+disabled-module transfer, future registry entries, designer persistence, native
+credit geometry, and actual image rendering/export against the asset pack.

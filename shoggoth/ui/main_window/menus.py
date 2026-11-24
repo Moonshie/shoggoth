@@ -10,6 +10,7 @@ from PySide6.QtGui import QAction, QActionGroup
 from shoggoth.i18n import get_available_languages, tr
 from shoggoth.ui.main_window import cloud, exports, help_dialogs, image_tools, projects
 from shoggoth.ui import snippet_loader, icon_browser
+from shoggoth.midnight.ui import ModulesMenu
 
 
 def create_menus(window):
@@ -21,6 +22,7 @@ def create_menus(window):
     _create_project_menu(window, menubar)
     _create_export_menu(window, menubar)
     _create_tools_menu(window, menubar)
+    window.modules_menu = ModulesMenu(window, menubar)
     _create_cloud_menu(window, menubar)
     _create_help_menu(window, menubar)
     _create_view_menu(window, menubar)

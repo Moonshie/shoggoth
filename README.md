@@ -1,8 +1,11 @@
 # Shoggoth
 ## Card creation software for Arkham Horror: The Card Game
 
-This fork's **midnight** branch adds project-local design tags. Open a project's
-**Design tags** tab to configure them, then assign them below a card's name.
+This fork's **midnight** branch adds optional **Design tags** and **Designer**
+modules. Toggle them in the top-row **Modules** menu. Configure tags in a
+project's **Design tags** tab; assign tags and enter designer credits below a
+card's name. Designer credits print as **Des. Name** on the right of the footer,
+before the collection icon and number.
 See [Midnight features and upstream updates](documentation/midnight.md) for usage,
 the extension boundary, and how to keep this branch current with Shoggoth.
 

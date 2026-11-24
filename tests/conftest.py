@@ -107,3 +107,13 @@ def _no_leaked_listeners():
     listeners = list(Project._change_listeners)
     yield
     Project._change_listeners[:] = listeners
+
+
+@pytest.fixture(autouse=True)
+def midnight_modules(tmp_path, monkeypatch):
+    """Module tests never read or write the user's activation preferences."""
+    from PySide6.QtCore import QSettings
+    from shoggoth.midnight import registry
+    manager = registry.ModuleManager(QSettings(str(tmp_path / 'modules.ini'), QSettings.IniFormat))
+    monkeypatch.setattr(registry, '_manager', manager)
+    return manager
