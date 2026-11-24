@@ -82,6 +82,11 @@ def card_display_name(card, include_level=False):
     else:
         name = card.name
     index = card.front.get('index')
+    if index and card.card_type in ('act', 'agenda'):
+        # "Act 1a: Name" / "Agenda 2b: Name" keeps related cards together and
+        # readable when sorted by label.
+        key = 'TREE_ACT_LABEL' if card.card_type == 'act' else 'TREE_AGENDA_LABEL'
+        return tr(key).format(index=index, name=name)
     if index:
         name = f'{index} {name}'
     return name
@@ -224,6 +229,7 @@ def build_tree_spec(project):
             'node_id': f'category:{encounter_set.name}:story{scope}',
             'text': tr('TREE_STORY'),
             'type': 'category',
+            'group': 'story',  # clicking it opens the story view
             'data': encounter_set,
             'icon': None,
             'children': []
@@ -240,6 +246,7 @@ def build_tree_spec(project):
             'node_id': f'category:{encounter_set.name}:encounter{scope}',
             'text': tr('TREE_ENCOUNTER'),
             'type': 'category',
+            'group': 'encounter',  # clicking it opens the encounter view
             'data': encounter_set,
             'icon': None,
             'children': []
